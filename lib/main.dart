@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staapp2025/theme/theme.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,10 +12,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'St Augustie CHS',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: appThemeData,
       home: const MyHomePage(title: 'St Augustine CHS'),
     );
   }
