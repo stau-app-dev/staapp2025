@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:staapp2025/theme/theme.dart';
+import 'package:staapp2025/theme/styles.dart';
 
 void main() {
   runApp(const MyApp());
@@ -52,13 +53,18 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       bottomNavigationBar: BottomAppBar(
         child: BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: Styles.primary,
+            selectedItemColor: Styles.secondary,
+            unselectedItemColor: Styles.white,
+            showSelectedLabels: false,
+            showUnselectedLabels: false,            
             onTap: (index) {
               setState(() {
                 pageController.jumpToPage(index);
               });
             },
             items: const [
-
               BottomNavigationBarItem(
                 icon: Icon(Icons.home_outlined),
                 label: '',

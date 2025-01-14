@@ -176,6 +176,7 @@ overline	labelSmall
 /// Converts a [color] to a material color.
 MaterialColor createMaterialColor(Color color) {
   int r = color.red, g = color.green, b = color.blue;
+  
   return MaterialColor(
     color.value,
     <int, Color>{
