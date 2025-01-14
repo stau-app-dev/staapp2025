@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:staugustinechsnewapp/utilities/profile/banner_dimensions.dart';
+import 'package:staapp2025/theme/banner_dimensions.dart';
 
 /// This class holds all the styling for the app.
 class Styles {

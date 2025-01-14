@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:staugustinechsnewapp/theme/styles.dart';
+import 'package:staapp2025/theme/styles.dart';
 
 ThemeData appThemeData = ThemeData(
   appBarTheme: const AppBarTheme(
@@ -19,9 +19,9 @@ ThemeData appThemeData = ThemeData(
       .copyWith(primary: Styles.primary, secondary: Styles.secondary),
   elevatedButtonTheme: ElevatedButtonThemeData(
       style: ButtonStyle(
-          foregroundColor: MaterialStateProperty.all<Color>(Styles.white),
-          backgroundColor: MaterialStateProperty.all<Color>(Styles.secondary),
-          shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+          foregroundColor: WidgetStateProperty.all<Color>(Styles.white),
+          backgroundColor: WidgetStateProperty.all<Color>(Styles.secondary),
+          shape: WidgetStateProperty.all<RoundedRectangleBorder>(
               const RoundedRectangleBorder(
                   borderRadius: Styles.mainBorderRadius,
                   side: BorderSide(color: Styles.secondary))))),
@@ -63,7 +63,7 @@ ThemeData appThemeData = ThemeData(
   primaryColor: createMaterialColor(Styles.primary),
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
-      primary: Styles.secondary,
+      foregroundColor: Styles.secondary,
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       textStyle: const TextStyle(fontFamily: Styles.fontFamilyNormal),
     ),
@@ -71,83 +71,99 @@ ThemeData appThemeData = ThemeData(
   textSelectionTheme: TextSelectionThemeData(
     cursorColor: Styles.secondary,
     selectionHandleColor: Styles.secondary,
-    selectionColor: Styles.secondary.withOpacity(0.5),
+    selectionColor: Styles.secondary.withAlpha(128),
   ),
   textTheme: const TextTheme(
-    headline1: TextStyle(
+    /*
+      NEW theme parameters
+headline1	displayLarge
+headline2	displayMedium
+headline3	displaySmall
+headline4	headlineMedium
+headline5	headlineSmall
+headline6	titleLarge
+subtitle1	titleMedium
+subtitle2	titleSmall
+bodyText1	bodyLarge
+bodyText2	bodyMedium
+caption	bodySmall
+button	labelLarge
+overline	labelSmall
+    */
+    displayLarge: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 96.0,
         fontWeight: FontWeight.w300,
         color: Styles.primary,
         letterSpacing: -1.5),
-    headline2: TextStyle(
+    displayMedium: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 60.0,
         fontWeight: FontWeight.w300,
         color: Styles.primary,
         letterSpacing: -0.5),
-    headline3: TextStyle(
+    displaySmall: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 48.0,
         fontWeight: FontWeight.w400,
         color: Styles.primary,
         letterSpacing: 0.0),
-    headline4: TextStyle(
+    headlineMedium: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 34.0,
         fontWeight: FontWeight.w400,
         color: Styles.primary,
         letterSpacing: 0.25),
-    headline5: TextStyle(
+    headlineSmall: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 24.0,
         fontWeight: FontWeight.w600,
         color: Styles.primary,
         letterSpacing: 0.0),
-    headline6: TextStyle(
+    titleLarge: TextStyle(
         fontFamily: Styles.fontFamilyTitles,
         fontSize: 18.0,
         fontWeight: FontWeight.bold,
         color: Styles.primary,
         letterSpacing: 0.15),
-    subtitle1: TextStyle(
+    titleMedium: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 16.0,
         fontWeight: FontWeight.w500,
         color: Styles.white,
         letterSpacing: 0.15),
-    subtitle2: TextStyle(
+    titleSmall: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 14.0,
         fontWeight: FontWeight.bold,
         color: Styles.primary,
         letterSpacing: 0.1),
-    bodyText1: TextStyle(
+    bodyLarge: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 16.0,
         fontWeight: FontWeight.w400,
         color: Styles.primary,
         letterSpacing: 0.5),
-    bodyText2: TextStyle(
+    bodyMedium: TextStyle(
       fontFamily: Styles.fontFamilyNormal,
       fontSize: 14.0,
       fontWeight: FontWeight.w400,
       color: Styles.primary,
       letterSpacing: 0.25,
     ),
-    button: TextStyle(
+    labelLarge: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 14.0,
         fontWeight: FontWeight.w500,
         color: Styles.primary,
         letterSpacing: 1.25),
-    caption: TextStyle(
+    bodySmall: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 12.0,
         fontWeight: FontWeight.w400,
         color: Styles.primary,
         letterSpacing: 0.4),
-    overline: TextStyle(
+    labelSmall: TextStyle(
         fontFamily: Styles.fontFamilyNormal,
         fontSize: 10.0,
         fontWeight: FontWeight.w400,
