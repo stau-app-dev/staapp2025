@@ -10,12 +10,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'St Augustie CHS',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'St Augustine CHS'),
     );
   }
 }
@@ -30,22 +30,65 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      _counter++;
-    });
-  }
+  final PageController pageController = PageController(initialPage: 0);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
+      body: PageView(
+        controller: pageController,
+        children: const <Widget>[
+          Center(
+            child: Home(),
+          ),
+          Center(
+            child: CafeteriaMenu(),
+          ),
+          Center(
+            child: SongRequests(),
+          ),
+          Center(
+            child: Profile(),
+          ),
+        ],
       ),
-      body: Center(
+      bottomNavigationBar: BottomAppBar(
+        child: BottomNavigationBar(
+            onTap: (index) {
+              setState(() {
+                pageController.jumpToPage(index);
+              });
+            },
+            items: const [
+
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home_outlined),
+                label: '',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.local_pizza),
+                label: '',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.music_note),
+                label: '',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.account_circle),
+                label: '',
+              ),
+            ],            
+        ),
+      ),
+    );
+  }
+}
+class Home extends StatelessWidget {
+    const Home({super.key});
+
+    @override
+    Widget build(BuildContext context) {
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
@@ -53,20 +96,74 @@ class _MyHomePageState extends State<MyHomePage> {
               'Hello World Everybody',
             ),
             const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+              'HOME',
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
+      );
+    }
 }
+
+class CafeteriaMenu extends StatelessWidget {
+    const CafeteriaMenu({super.key});
+
+    @override
+    Widget build(BuildContext context) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            const Text(
+              'Hello World Everybody',
+            ),
+            const Text(
+              'CAFETERIA MENU',
+            ),
+          ],
+        ),
+      );
+    }
+}
+
+class SongRequests extends StatelessWidget {
+    const SongRequests({super.key});
+
+    @override
+    Widget build(BuildContext context) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            const Text(
+              'Hello World Everybody',
+            ),
+            const Text(
+              'SONG REQUESTS',
+            ),
+          ],
+        ),
+      );
+    }
+}
+
+class Profile extends StatelessWidget {
+    const Profile({super.key});
+
+    @override
+    Widget build(BuildContext context) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            const Text(
+              'Hello World Everybody',
+            ),
+            const Text(
+              'Profile',
+            ),
+          ],
+        ),
+      );
+    }
+}
+
