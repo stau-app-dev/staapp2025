@@ -172,24 +172,19 @@ overline	labelSmall
   ),
 );
 
-// From: https://medium.com/py-bits/turn-any-color-to-material-color-for-flutter-d8e8e037a837
-/// Converts a [color] to a material color.
 MaterialColor createMaterialColor(Color color) {
-  int r = color.red, g = color.green, b = color.blue;
-  
-  return MaterialColor(
-    color.value,
-    <int, Color>{
-      50: Color.fromRGBO(r, g, b, .1),
-      100: Color.fromRGBO(r, g, b, .2),
-      200: Color.fromRGBO(r, g, b, .3),
-      300: Color.fromRGBO(r, g, b, .4),
-      400: Color.fromRGBO(r, g, b, .5),
-      500: Color.fromRGBO(r, g, b, .6),
-      600: Color.fromRGBO(r, g, b, .7),
-      700: Color.fromRGBO(r, g, b, .8),
-      800: Color.fromRGBO(r, g, b, .9),
-      900: Color.fromRGBO(r, g, b, 1),
-    },
-  );
+  Map<int, Color> swatch = {
+    50: Color.alphaBlend(color.withAlpha(26), Colors.white),
+    100: Color.alphaBlend(color.withAlpha(51), Colors.white),
+    200: Color.alphaBlend(color.withAlpha(77), Colors.white),
+    300: Color.alphaBlend(color.withAlpha(102), Colors.white),
+    400: Color.alphaBlend(color.withAlpha(128), Colors.white),
+    500: Color.alphaBlend(color.withAlpha(153), Colors.white),
+    600: Color.alphaBlend(color.withAlpha(179), Colors.white),
+    700: Color.alphaBlend(color.withAlpha(204), Colors.white),
+    800: Color.alphaBlend(color.withAlpha(230), Colors.white),
+    900: color, // No change to the original color
+  };
+
+  return MaterialColor(color.hashCode, swatch);
 }
