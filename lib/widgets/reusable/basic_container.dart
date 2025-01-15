@@ -19,12 +19,11 @@ class BasicContainer extends StatelessWidget {
 
   /// {@macro basic_container}
   const BasicContainer(
-      {Key? key,
+      {super.key,
       required this.child,
       this.decoration,
       this.padding,
-      this.onPressed})
-      : super(key: key);
+      this.onPressed});
 
   @override
   Widget build(BuildContext context) {

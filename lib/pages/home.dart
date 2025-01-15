@@ -35,7 +35,31 @@ class HomePage extends StatelessWidget {
                           dayNumber: 1,
                           userName: 'Cadawas',
                         ),
-
+                        SizedBox(height: Styles.mainVerticalPadding),
+                        WelcomeBanner(
+                          dayNumber: 1,
+                          userName: 'Cadawas',
+                        ),
+                        SizedBox(height: Styles.mainVerticalPadding),
+                        WelcomeBanner(
+                          dayNumber: 1,
+                          userName: 'Cadawas',
+                        ),                        
+                        SizedBox(height: Styles.mainVerticalPadding),
+                        WelcomeBanner(
+                          dayNumber: 1,
+                          userName: 'Cadawas',
+                        ),                        
+                        SizedBox(height: Styles.mainVerticalPadding),
+                        WelcomeBanner(
+                          dayNumber: 1,
+                          userName: 'Cadawas',
+                        ),                        
+                        SizedBox(height: Styles.mainVerticalPadding),
+                        WelcomeBanner(
+                          dayNumber: 1,
+                          userName: 'Cadawas',
+                        ),                        
                       ],
                     ),
                 ),

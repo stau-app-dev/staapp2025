@@ -7,8 +7,7 @@ class WelcomeBanner extends StatelessWidget {
   final int? dayNumber;
   final String? userName;
 
-  const WelcomeBanner({Key? key, this.dayNumber, this.userName})
-      : super(key: key);
+  const WelcomeBanner({super.key, this.dayNumber, this.userName});
 
   double getChildWidth(BuildContext context, double percentage) =>
       MediaQuery.of(context).size.width * percentage - Styles.mainInsidePadding;
