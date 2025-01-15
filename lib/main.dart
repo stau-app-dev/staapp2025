@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:staapp2025/theme/theme.dart';
 import 'package:staapp2025/theme/styles.dart';
+import 'package:staapp2025/pages/home.dart';
+import 'package:staapp2025/pages/caf.dart';
+import 'package:staapp2025/pages/songs.dart';
+import 'package:staapp2025/pages/profile.dart';
 
 void main() {
   runApp(MyApp());
@@ -80,64 +84,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Scaffold(
-        body: Center(
-          child: Text('Welcome to the Home Page!', style: TextStyle(fontSize: 18)),
-        ),
-      ),
-    );
-  }
-}
-
-class CafeteriaMenuPage extends StatelessWidget {
-  const CafeteriaMenuPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Scaffold(
-        body: Center(
-          child: Text('Check out our delicious menu!', style: TextStyle(fontSize: 18)),
-        ),
-      ),
-    );
-  }
-}
-
-class SongRequestsPage extends StatelessWidget {
-  const SongRequestsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Scaffold(
-        body: Center(
-          child: Text('Request your favorite songs!', style: TextStyle(fontSize: 18)),
-        ),
-      ),
-    );
-  }
-}
-
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Scaffold(
-        body: Center(
-          child: Text('View and edit your profile.', style: TextStyle(fontSize: 18)),
-        ),
-      ),
-    );
-  }
-}
-
