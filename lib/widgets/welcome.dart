@@ -53,7 +53,7 @@ class WelcomeBanner extends StatelessWidget {
             Container(
                 constraints: const BoxConstraints(maxHeight: 200.0),
                 width: getChildWidth(context, 0.3),
-                child: Image.asset('/assets/logos/sta_logo.png',
+                child: Image.asset('assets/logos/sta_logo.png',
                     fit: BoxFit.fitHeight)),
           ],
         ));
