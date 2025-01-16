@@ -3,6 +3,7 @@ import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:staapp2025/theme/styles.dart';
 import 'package:staapp2025/widgets/reusable/basic_container.dart';
 import 'package:staapp2025/widgets/reusable/rounded_button.dart';
+import 'package:staapp2025/models/announcement.dart';
 
 /// {@template announcements_board}
 /// Reusable widget for displaying a list of announcements.
@@ -52,7 +53,7 @@ class AnnouncementsBoard extends StatelessWidget {
                       decoration: TextDecoration.underline,
                     ),
                 onOpen: (link) async {
-                  launchURL(context: context, url: link.url);
+                  //launchURL(context: context, url: link.url);
                 },
               ),
             ]));
@@ -101,15 +102,5 @@ class AnnouncementsBoard extends StatelessWidget {
     ));
   }
   
-  void launchURL({required BuildContext context, required String url}) async {
-  if (await canLaunch(url)) {
-    await launch(url);
-  } else {
-    useCustomSnackbar(
-        context: context,
-        message: 'Could not launch $url',
-        type: ESnackBarType.failure);
-    throw 'Could not launch $url';
-  }
-}
+
 }
