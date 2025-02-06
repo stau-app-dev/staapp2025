@@ -7,6 +7,8 @@ import 'package:staapp2025/widgets/cafeitems.dart';
 import 'package:staapp2025/widgets/spirit_meter.dart';
 import 'package:staapp2025/widgets/welcome.dart';
 import 'package:staapp2025/models/announcement.dart';
+import 'package:staapp2025/widgets/chaplaincycorner.dart';
+import 'package:staapp2025/models/verseofday.dart';
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
@@ -51,6 +53,9 @@ class HomePage extends StatelessWidget {
     SpiritMeters gradespirit =
         SpiritMeters(nine: 4, ten: 8, eleven: 16, twelve: 32);
 
+    VerseOfDay todaysverse = VerseOfDay(
+        verseOfDay: 'Love is patient.  Love is kind.  Love is never envious.');
+
     // Ignore the OS safearea
     return SafeArea(
       top: true,
@@ -88,6 +93,8 @@ class HomePage extends StatelessWidget {
                     SpiritMeterBars(
                       spiritMeters: gradespirit,
                     ),
+                    SizedBox(height: Styles.mainVerticalPadding),
+                    ChaplaincyCorner(),
                     SizedBox(height: Styles.mainVerticalPadding),
                   ],
                 ),
