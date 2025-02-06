@@ -57,8 +57,8 @@ class ImageShadowContainer extends StatelessWidget {
                   end: FractionalOffset.bottomCenter,
                   colors: [
                     Styles.transparent,
-                    Styles.grey.withOpacity(0.1),
-                    Styles.grey.withOpacity(0.5),
+                    Styles.grey.withValues(alpha: 0.1),
+                    Styles.grey.withValues(alpha: 0.5),
                   ],
                   stops: const [
                     0.3,

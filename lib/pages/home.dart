@@ -52,27 +52,25 @@ class HomePage extends StatelessWidget {
             physics: const BouncingScrollPhysics(
                 parent: AlwaysScrollableScrollPhysics()),
             children: <Widget>[
-              Flexible(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Styles.mainHorizontalPadding),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: <Widget>[
-                      SizedBox(height: Styles.mainVerticalPadding),
-                      WelcomeBanner(
-                        dayNumber: 1,
-                        userName: 'Cadawas',
-                      ),
-                      SizedBox(height: Styles.mainVerticalPadding),
-                      AnnouncementsBoard(
-                        announcements: data,
-                      ),
-                      SizedBox(height: Styles.mainVerticalPadding),
-                      //CafeItems(title: 'Specials', items: menuitems),
-                      //SizedBox(height: Styles.mainVerticalPadding),
-                    ],
-                  ),
+              Padding(
+                padding: EdgeInsets.symmetric(
+                    horizontal: Styles.mainHorizontalPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    SizedBox(height: Styles.mainVerticalPadding),
+                    WelcomeBanner(
+                      dayNumber: 1,
+                      userName: 'Cadawas',
+                    ),
+                    SizedBox(height: Styles.mainVerticalPadding),
+                    AnnouncementsBoard(
+                      announcements: data,
+                    ),
+                    SizedBox(height: Styles.mainVerticalPadding),
+                    CafeItems(title: 'Specials', items: menuitems),
+                    SizedBox(height: Styles.mainVerticalPadding),
+                  ],
                 ),
               ),
             ],
