@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:staapp2025/models/cafemenuitem.dart';
+import 'package:staapp2025/models/spirit_meters.dart';
 import 'package:staapp2025/theme/styles.dart';
 import 'package:staapp2025/widgets/announcements.dart';
 import 'package:staapp2025/widgets/cafeitems.dart';
+import 'package:staapp2025/widgets/spirit_meter.dart';
 import 'package:staapp2025/widgets/welcome.dart';
 import 'package:staapp2025/models/announcement.dart';
 
@@ -35,6 +37,19 @@ class HomePage extends StatelessWidget {
         price: 3.99,
         pictureUrl:
             'https://firebasestorage.googleapis.com/v0/b/staugustinechsapp.appspot.com/o/newCafeMenuItems%2FPizza.jpg?alt=media&token=25f12b06-65ca-408f-84d6-d2ef62752ccf'));
+    menuitems.add(const CafeMenuItem(
+        name: 'pizza',
+        price: 3.99,
+        pictureUrl:
+            'https://firebasestorage.googleapis.com/v0/b/staugustinechsapp.appspot.com/o/newCafeMenuItems%2FPizza.jpg?alt=media&token=25f12b06-65ca-408f-84d6-d2ef62752ccf'));
+    menuitems.add(const CafeMenuItem(
+        name: 'pizza',
+        price: 3.99,
+        pictureUrl:
+            'https://firebasestorage.googleapis.com/v0/b/staugustinechsapp.appspot.com/o/newCafeMenuItems%2FPizza.jpg?alt=media&token=25f12b06-65ca-408f-84d6-d2ef62752ccf'));
+
+    SpiritMeters gradespirit =
+        SpiritMeters(nine: 4, ten: 8, eleven: 16, twelve: 32);
 
     // Ignore the OS safearea
     return SafeArea(
@@ -69,6 +84,10 @@ class HomePage extends StatelessWidget {
                     ),
                     SizedBox(height: Styles.mainVerticalPadding),
                     CafeItems(title: 'Specials', items: menuitems),
+                    SizedBox(height: Styles.mainVerticalPadding),
+                    SpiritMeterBars(
+                      spiritMeters: gradespirit,
+                    ),
                     SizedBox(height: Styles.mainVerticalPadding),
                   ],
                 ),
