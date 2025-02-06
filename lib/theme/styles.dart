@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:staapp2025/widgets/reusable/banner_dimensions.dart';
 
 /// This class holds all the styling for the app.
 class Styles {
@@ -63,6 +64,11 @@ class Styles {
   /// Main padding inside widgets. Default is 20.0
   static const double mainInsidePadding = 20.0;
 
+  static Map<String, double> pictureContainerDimensions(
+          {required BuildContext context,
+          required double width,
+          double? ratioXY}) =>
+      getBannerDimensions(context: context, width: width, ratioXY: ratioXY);
 }
 
 /// Use this method to determine if the app should render the UI for a tablet.

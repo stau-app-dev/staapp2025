@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:staapp2025/models/cafemenuitem.dart';
 import 'package:staapp2025/theme/styles.dart';
 import 'package:staapp2025/widgets/announcements.dart';
+import 'package:staapp2025/widgets/cafeitems.dart';
 import 'package:staapp2025/widgets/welcome.dart';
 import 'package:staapp2025/models/announcement.dart';
 
@@ -26,6 +28,13 @@ class HomePage extends StatelessWidget {
     data.add(
         const Announcement(title: 'App Dev', content: 'Keep practicing!!!'));
     data.add(const Announcement(title: 'Japang', content: 'Coming Soon!!!'));
+
+    List<CafeMenuItem> menuitems = [];
+    menuitems.add(const CafeMenuItem(
+        name: 'pizza',
+        price: 3.99,
+        pictureUrl:
+            'https://firebasestorage.googleapis.com/v0/b/staugustinechsapp.appspot.com/o/newCafeMenuItems%2FPizza.jpg?alt=media&token=25f12b06-65ca-408f-84d6-d2ef62752ccf'));
 
     // Ignore the OS safearea
     return SafeArea(
@@ -59,6 +68,9 @@ class HomePage extends StatelessWidget {
                       AnnouncementsBoard(
                         announcements: data,
                       ),
+                      SizedBox(height: Styles.mainVerticalPadding),
+                      //CafeItems(title: 'Specials', items: menuitems),
+                      //SizedBox(height: Styles.mainVerticalPadding),
                     ],
                   ),
                 ),
