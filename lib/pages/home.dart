@@ -94,7 +94,9 @@ class HomePage extends StatelessWidget {
                       spiritMeters: gradespirit,
                     ),
                     SizedBox(height: Styles.mainVerticalPadding),
-                    ChaplaincyCorner(),
+                    ChaplaincyCorner(
+                      verseOfDay: todaysverse,
+                    ),
                     SizedBox(height: Styles.mainVerticalPadding),
                   ],
                 ),
