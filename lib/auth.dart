@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 // import 'package:provider/provider.dart';
 import 'services/home_service.dart';
@@ -88,9 +89,27 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
     });
 
-    // Try silent sign-in and, if successful, fetch remote user immediately.
+    // Try silent sign-in only for returning users on web to avoid odd FedCM
+    // popups on first run. Mobile platforms can always attempt; web is gated.
     try {
-      final account = await _googleSignIn.signInSilently();
+      bool allowSilent = true;
+      if (kIsWeb) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          allowSilent = prefs.getBool('wasSignedIn') ?? false;
+        } catch (_) {
+          allowSilent = false;
+        }
+      }
+
+      if (allowSilent && kIsWeb) {
+        // Give the web GIS/FedCM stack a moment to initialize before
+        // attempting a silent sign-in to reduce flaky popups.
+        await Future.delayed(const Duration(milliseconds: 400));
+      }
+      final account = allowSilent
+          ? await _googleSignIn.signInSilently(suppressErrors: true)
+          : null;
       if (account != null) {
         // Enforce domain restriction on silent sign-in as well
         if (!_isAllowedEmail(account.email)) {
@@ -181,6 +200,14 @@ class AuthService extends ChangeNotifier {
         // ignore remote fetch errors but log
         debugPrint('[Auth] getUser failed: $e');
       }
+      // Mark that this origin had a successful sign-in so future web boots can
+      // attempt silent sign-in without user interaction.
+      if (kIsWeb) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('wasSignedIn', true);
+        } catch (_) {}
+      }
       notifyListeners();
     } catch (e, st) {
       debugPrint('[Auth] signInWithGoogle error: $e');
@@ -193,6 +220,12 @@ class AuthService extends ChangeNotifier {
     await _googleSignIn.signOut();
     _user = null;
     _remoteUser = null;
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('wasSignedIn', false);
+      } catch (_) {}
+    }
     notifyListeners();
   }
 

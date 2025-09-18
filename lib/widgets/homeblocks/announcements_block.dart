@@ -14,7 +14,8 @@ class AnnouncementsBlock extends StatefulWidget {
   State<AnnouncementsBlock> createState() => AnnouncementsBlockState();
 }
 
-class AnnouncementsBlockState extends State<AnnouncementsBlock> {
+class AnnouncementsBlockState extends State<AnnouncementsBlock>
+    with WidgetsBindingObserver {
   List<Map<String, String>> announcements = const [
     {'title': 'Titans', 'body': 'No announcements today'},
   ];
@@ -23,9 +24,17 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock> {
   bool _error = false;
   String? _errorMessage;
 
+  // When a teacher opens the external Google Form, we mark that we expect
+  // to return and then refresh announcements after a slight delay to allow
+  // the external data pipeline to complete.
+  bool _pendingExternalReturn = false;
+  Timer? _resumeRefreshTimer;
+  Timer? _fallbackRefreshTimer;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fetchAnnouncements();
   }
 
@@ -69,6 +78,40 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock> {
   }
 
   @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    try {
+      _resumeRefreshTimer?.cancel();
+    } catch (_) {}
+    try {
+      _fallbackRefreshTimer?.cancel();
+    } catch (_) {}
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // When returning to the app after opening the external form, wait a bit
+    // for the pipeline (Form -> Sheet -> Apps Script -> PHP -> DB -> Function)
+    // and then refresh announcements.
+    if (state == AppLifecycleState.resumed && _pendingExternalReturn) {
+      // Cancel any fallback timer because we've detected an actual resume.
+      try {
+        _fallbackRefreshTimer?.cancel();
+      } catch (_) {}
+      // Debounce: avoid scheduling multiple times.
+      try {
+        _resumeRefreshTimer?.cancel();
+      } catch (_) {}
+      _resumeRefreshTimer = Timer(const Duration(seconds: 8), () async {
+        if (!mounted) return;
+        await refreshAnnouncements();
+        _pendingExternalReturn = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthService>(context);
     final userEmail = auth.user?.email ?? '';
@@ -97,10 +140,27 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock> {
                     }
                     final uri = Uri.parse(url);
                     if (await canLaunchUrl(uri)) {
-                      await launchUrl(
+                      final launched = await launchUrl(
                         uri,
                         mode: LaunchMode.externalApplication,
                       );
+                      if (launched) {
+                        // Mark that we expect to return; schedule a fallback
+                        // delayed refresh in case lifecycle events aren't
+                        // delivered (e.g., on some web contexts).
+                        _pendingExternalReturn = true;
+                        try {
+                          _fallbackRefreshTimer?.cancel();
+                        } catch (_) {}
+                        _fallbackRefreshTimer = Timer(
+                          const Duration(seconds: 15),
+                          () async {
+                            if (!mounted) return;
+                            await refreshAnnouncements();
+                            _pendingExternalReturn = false;
+                          },
+                        );
+                      }
                     } else {
                       messenger.showSnackBar(
                         SnackBar(content: Text('Could not open form URL')),
