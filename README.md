@@ -20,6 +20,12 @@ Key code areas:
 - `lib/profile.dart` – Profile UI and logout
 - `lib/consts.dart` – Profanity list and helpers (client-side UX only)
 
+## Screenshots
+
+| Home Screen |
+| --- |
+| <img src="screens/homescreen.png" alt="Home screen" width="360" /> |
+
 ## Prerequisites
 
 - Flutter SDK installed (Dart >= 3.9 as per `pubspec.yaml`)
