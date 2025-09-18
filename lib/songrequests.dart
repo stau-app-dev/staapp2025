@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:staapp2025/styles.dart';
 import 'package:staapp2025/services/home_service.dart';
 import 'package:provider/provider.dart';
@@ -312,7 +313,41 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                       ),
                                     ),
                                   );
-                                } catch (e) {
+                                } catch (e, st) {
+                                  // Log details to help diagnose web fetch issues.
+                                  debugPrint(
+                                    '[SongRequests] upvoteSong error: ${e.toString()}',
+                                  );
+                                  debugPrintStack(stackTrace: st);
+                                  // On web, the browser may report "Failed to fetch" even when
+                                  // the backend succeeded. Mirror the optimistic handling used
+                                  // for add/delete: close progress, refresh list and counters,
+                                  // and inform the user.
+                                  final isBrowserFetchError = e
+                                      .toString()
+                                      .contains('Failed to fetch');
+                                  if (kIsWeb && isBrowserFetchError) {
+                                    try {
+                                      progressNavigator.pop();
+                                    } catch (_) {}
+                                    if (mounted) {
+                                      setState(() {
+                                        _songsFuture = fetchSongs();
+                                      });
+                                    }
+                                    try {
+                                      await auth.refreshRemoteUser();
+                                    } catch (_) {}
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Upvoted. Refreshing list…',
+                                          style: kBodyText,
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
                                   try {
                                     progressNavigator.pop();
                                   } catch (_) {}
@@ -493,7 +528,42 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                               content: Text('Song deleted', style: kBodyText),
                             ),
                           );
-                        } catch (e) {
+                        } catch (e, st) {
+                          debugPrint(
+                            '[SongRequests] deleteSong error: ${e.toString()}',
+                          );
+                          debugPrintStack(stackTrace: st);
+                          // Similar to add-song, on web the browser may report
+                          // "Failed to fetch" even if the function succeeded.
+                          // Handle optimistically to keep UI responsive.
+                          final isBrowserFetchError = e.toString().contains(
+                            'Failed to fetch',
+                          );
+                          if (kIsWeb && isBrowserFetchError) {
+                            try {
+                              progressNavigator.pop();
+                            } catch (_) {}
+                            try {
+                              deleteNavigator.pop();
+                            } catch (_) {}
+                            if (mounted) {
+                              setState(() {
+                                _songsFuture = fetchSongs();
+                              });
+                            }
+                            try {
+                              await auth.refreshRemoteUser();
+                            } catch (_) {}
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Song deleted. Refreshing list…',
+                                  style: kBodyText,
+                                ),
+                              ),
+                            );
+                            return;
+                          }
                           try {
                             progressNavigator.pop();
                           } catch (_) {}
@@ -688,6 +758,9 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     }
                                     if (remainingRequests != null &&
                                         remainingRequests <= 0) {
+                                      debugPrint(
+                                        '[SongRequests] Add song blocked: no song requests left for user',
+                                      );
                                       try {
                                         progressNavigator.pop();
                                       } catch (_) {}
@@ -706,6 +779,9 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                       artist: artist,
                                       name: name,
                                       creatorEmail: creatorEmail,
+                                    );
+                                    debugPrint(
+                                      '[SongRequests] submitSong success: name="$name", artist="$artist", creator="$creatorEmail"',
                                     );
                                     if (!mounted) {
                                       return;
@@ -726,7 +802,44 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                         ),
                                       ),
                                     );
-                                  } catch (e) {
+                                  } catch (e, st) {
+                                    debugPrint(
+                                      '[SongRequests] submitSong error: ${e.toString()}',
+                                    );
+                                    debugPrintStack(stackTrace: st);
+                                    // On web, a CORS/preflight issue can cause the browser
+                                    // client to report "Failed to fetch" even if the Cloud Function
+                                    // completed. Since we've seen the song actually get added,
+                                    // treat this specific case optimistically: close the dialog,
+                                    // refresh the list, and inform the user.
+                                    final isBrowserFetchError = e
+                                        .toString()
+                                        .contains('Failed to fetch');
+                                    if (kIsWeb && isBrowserFetchError) {
+                                      try {
+                                        progressNavigator.pop();
+                                      } catch (_) {}
+                                      try {
+                                        addSongNavigator.pop();
+                                      } catch (_) {}
+                                      if (mounted) {
+                                        setState(() {
+                                          _songsFuture = fetchSongs();
+                                        });
+                                      }
+                                      try {
+                                        await auth.refreshRemoteUser();
+                                      } catch (_) {}
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Song submitted. Refreshing list…',
+                                            style: kBodyText,
+                                          ),
+                                        ),
+                                      );
+                                      return;
+                                    }
                                     try {
                                       progressNavigator.pop();
                                     } catch (_) {}

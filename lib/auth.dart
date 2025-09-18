@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 // import 'package:provider/provider.dart';
 import 'services/home_service.dart';
 
 class AuthService extends ChangeNotifier {
-  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+  // Pass the Web client ID only for web builds; mobile uses platform configs.
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: kIsWeb
+        ? '448336593725-hf3ebb7vnfsn8gttr26tnefk051i2fis.apps.googleusercontent.com'
+        : null,
+    scopes: ['email', 'profile'],
+  );
 
   GoogleSignInAccount? _user;
   GoogleSignInAccount? get user => _user;
