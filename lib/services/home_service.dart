@@ -92,10 +92,19 @@ Future<String?> fetchAnnouncementFormUrl({http.Client? client}) async {
 /// 'creatorEmail', 'createdAt' (as Map), 'upvotes' (int), and 'id'.
 Future<List<Map<String, dynamic>>> fetchSongs({http.Client? client}) async {
   client ??= http.Client();
+  // Add a cache-busting query param to avoid any intermediary caching on web
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getSongs',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/getSongs?t=${DateTime.now().millisecondsSinceEpoch}',
   );
-  final resp = await client.get(url).timeout(Duration(seconds: 6));
+  final resp = await client
+      .get(
+        url,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache',
+        },
+      )
+      .timeout(Duration(seconds: 12));
   if (resp.statusCode != 200) throw Exception('Failed to load songs');
   final body = json.decode(resp.body);
   if (body is Map && body['data'] is List) {
@@ -134,7 +143,8 @@ Future<Map<String, dynamic>> submitSong({
   // the raw string.
   final resp = await client
       .post(url, headers: {'Content-Type': 'text/plain'}, body: body)
-      .timeout(Duration(seconds: 8));
+      // Increase timeout to better tolerate cold starts on the backend
+      .timeout(Duration(seconds: 20));
 
   if (resp.statusCode != 200) {
     // Try to decode JSON error body if possible, otherwise return raw body
@@ -181,7 +191,8 @@ Future<Map<String, dynamic>> upvoteSong({
 
   final resp = await client
       .post(url, headers: {'Content-Type': 'text/plain'}, body: body)
-      .timeout(Duration(seconds: 8));
+      // Increase timeout to better tolerate cold starts on the backend
+      .timeout(Duration(seconds: 20));
 
   if (resp.statusCode != 200) {
     try {
@@ -221,7 +232,8 @@ Future<Map<String, dynamic>> deleteSong({
 
   final resp = await client
       .post(url, headers: {'Content-Type': 'text/plain'}, body: body)
-      .timeout(Duration(seconds: 8));
+      // Increase timeout to better tolerate cold starts on the backend
+      .timeout(Duration(seconds: 20));
 
   if (resp.statusCode != 200) {
     try {

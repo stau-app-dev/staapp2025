@@ -114,7 +114,7 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthService>(context);
-    final userEmail = auth.user?.email ?? '';
+    final userEmail = auth.email ?? '';
     final canAdd = userEmail.toLowerCase().endsWith('ycdsb.ca');
 
     return Container(

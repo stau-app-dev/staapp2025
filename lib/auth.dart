@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 // import 'package:provider/provider.dart';
 import 'services/home_service.dart';
 
@@ -14,8 +15,77 @@ class AuthService extends ChangeNotifier {
     scopes: ['email', 'profile'],
   );
 
-  GoogleSignInAccount? _user;
+  GoogleSignInAccount? _user; // mobile (google_sign_in)
   GoogleSignInAccount? get user => _user;
+  // Web uses FirebaseAuth; provide convenience getters so UI can stay the same.
+  String? get _currentEmail {
+    if (kIsWeb) return fb.FirebaseAuth.instance.currentUser?.email;
+    return _user?.email;
+  }
+
+  // Public getters for UI code
+  String? get email => _currentEmail;
+  String? get displayName {
+    if (kIsWeb) {
+      final u = fb.FirebaseAuth.instance.currentUser;
+      if (u == null) return null;
+      final dn = u.displayName;
+      if (dn != null && dn.trim().isNotEmpty) return dn;
+      for (final p in u.providerData) {
+        if (p.providerId == 'google.com' &&
+            p.displayName != null &&
+            p.displayName!.trim().isNotEmpty) {
+          return p.displayName;
+        }
+      }
+      return null;
+    }
+    return _user?.displayName;
+  }
+
+  String? get photoUrl {
+    if (kIsWeb) {
+      final u = fb.FirebaseAuth.instance.currentUser;
+      if (u == null) return null;
+      final ph = u.photoURL;
+      if (ph != null && ph.isNotEmpty) return ph;
+      for (final p in u.providerData) {
+        if (p.providerId == 'google.com' &&
+            p.photoURL != null &&
+            p.photoURL!.isNotEmpty) {
+          return p.photoURL;
+        }
+      }
+      return null;
+    }
+    return _user?.photoUrl;
+  }
+
+  String? get userId =>
+      kIsWeb ? (fb.FirebaseAuth.instance.currentUser?.uid) : _user?.id;
+
+  /// The ID to use when calling our backend. On web prefer the Google provider
+  /// UID (matches legacy google_sign_in id) and fall back to Firebase UID.
+  /// On mobile, use GoogleSignInAccount.id.
+  String? get backendUserId {
+    if (kIsWeb) {
+      return _webGoogleProviderUid ?? fb.FirebaseAuth.instance.currentUser?.uid;
+    }
+    return _user?.id;
+  }
+
+  // Helper: Google provider UID for web (matches legacy GoogleSignIn id)
+  String? get _webGoogleProviderUid {
+    final u = fb.FirebaseAuth.instance.currentUser;
+    if (u == null) return null;
+    for (final p in u.providerData) {
+      final puid = p.uid;
+      if (p.providerId == 'google.com' && puid != null && puid.isNotEmpty) {
+        return puid;
+      }
+    }
+    return null;
+  }
 
   Map<String, dynamic>? _remoteUser;
   Map<String, dynamic>? get remoteUser => _remoteUser;
@@ -36,7 +106,7 @@ class AuthService extends ChangeNotifier {
 
     // 2) Fallback to email domain check
     String? email = _remoteUser?['email'] as String?;
-    email ??= _user?.email;
+    email ??= _currentEmail;
     if (email != null) {
       final lower = email.toLowerCase().trim();
       if (lower.endsWith('ycdsb.ca')) return true;
@@ -47,7 +117,8 @@ class AuthService extends ChangeNotifier {
     return false;
   }
 
-  bool get isSignedIn => _user != null;
+  bool get isSignedIn =>
+      kIsWeb ? (fb.FirebaseAuth.instance.currentUser != null) : (_user != null);
 
   bool _isAllowedEmail(String? email) {
     if (email == null) return false;
@@ -56,12 +127,57 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> init() async {
-    // When the Google account changes (sign in/out), update local state and
-    // refresh the remote user profile.
+    if (kIsWeb) {
+      // Web: rely on Firebase Auth session. Restore immediately if present.
+      fb.FirebaseAuth.instance.authStateChanges().listen((fb.User? u) async {
+        if (u != null) {
+          // Enforce domain restriction
+          final email = u.email;
+          if (!_isAllowedEmail(email)) {
+            debugPrint('[Auth] Web auth blocked for $email');
+            await fb.FirebaseAuth.instance.signOut();
+            _remoteUser = null;
+            notifyListeners();
+            return;
+          }
+          try {
+            final providerUid = _webGoogleProviderUid;
+            final backendId = providerUid ?? u.uid;
+            String name = u.displayName ?? '';
+            if (name.trim().isEmpty) {
+              for (final p in u.providerData) {
+                if (p.providerId == 'google.com' &&
+                    p.displayName != null &&
+                    p.displayName!.trim().isNotEmpty) {
+                  name = p.displayName!;
+                  break;
+                }
+              }
+            }
+            final remote = await getUser(
+              id: backendId,
+              email: email ?? '',
+              name: name,
+            );
+            _remoteUser = remote;
+          } catch (e) {
+            debugPrint('[Auth] getUser (web) failed: $e');
+            _remoteUser = null;
+          }
+        } else {
+          _remoteUser = null;
+        }
+        notifyListeners();
+      });
+      // No-op: state will arrive via authStateChanges; if a session exists,
+      // currentUser is non-null immediately.
+      return;
+    }
+
+    // Mobile: keep google_sign_in behavior (silent + listener)
     _googleSignIn.onCurrentUserChanged.listen((account) async {
       _user = account;
       if (account != null) {
-        // Enforce domain restriction
         if (!_isAllowedEmail(account.email)) {
           debugPrint('[Auth] Disallowed domain attempted: ${account.email}');
           try {
@@ -89,29 +205,9 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
     });
 
-    // Try silent sign-in only for returning users on web to avoid odd FedCM
-    // popups on first run. Mobile platforms can always attempt; web is gated.
     try {
-      bool allowSilent = true;
-      if (kIsWeb) {
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          allowSilent = prefs.getBool('wasSignedIn') ?? false;
-        } catch (_) {
-          allowSilent = false;
-        }
-      }
-
-      if (allowSilent && kIsWeb) {
-        // Give the web GIS/FedCM stack a moment to initialize before
-        // attempting a silent sign-in to reduce flaky popups.
-        await Future.delayed(const Duration(milliseconds: 400));
-      }
-      final account = allowSilent
-          ? await _googleSignIn.signInSilently(suppressErrors: true)
-          : null;
+      final account = await _googleSignIn.signInSilently();
       if (account != null) {
-        // Enforce domain restriction on silent sign-in as well
         if (!_isAllowedEmail(account.email)) {
           debugPrint('[Auth] Silent sign-in blocked for ${account.email}');
           try {
@@ -146,6 +242,47 @@ class AuthService extends ChangeNotifier {
   Future<void> signInWithGoogle() async {
     try {
       debugPrint('[Auth] Starting Google sign-in');
+      if (kIsWeb) {
+        final provider = fb.GoogleAuthProvider();
+        bool useRedirect = false;
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          useRedirect = prefs.getBool('useWebRedirect') ?? false;
+        } catch (_) {}
+        if (useRedirect) {
+          await fb.FirebaseAuth.instance.signInWithRedirect(provider);
+          return;
+        }
+        fb.UserCredential cred;
+        try {
+          cred = await fb.FirebaseAuth.instance.signInWithPopup(provider);
+        } catch (e) {
+          // Popup blocked or not allowed – remember and fall back to redirect next time
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('useWebRedirect', true);
+          } catch (_) {}
+          await fb.FirebaseAuth.instance.signInWithRedirect(provider);
+          // Return here; the flow will resume on redirect landing.
+          return;
+        }
+        final u = cred.user;
+        if (u == null) throw Exception('Sign in failed');
+        if (!_isAllowedEmail(u.email)) {
+          await fb.FirebaseAuth.instance.signOut();
+          throw Exception('Use your ycdsb.ca or ycdsbk12.ca email.');
+        }
+        // Web state will propagate via authStateChanges listener.
+        if (kIsWeb) {
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('wasSignedIn', true);
+          } catch (_) {}
+        }
+        notifyListeners();
+        return;
+      }
+
       final account = await _googleSignIn.signIn();
       if (account == null) {
         debugPrint(
@@ -202,7 +339,8 @@ class AuthService extends ChangeNotifier {
       }
       // Mark that this origin had a successful sign-in so future web boots can
       // attempt silent sign-in without user interaction.
-      if (kIsWeb) {
+      // Mobile path already persisted via shared_prefs earlier (kept here if needed)
+      if (!kIsWeb) {
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('wasSignedIn', true);
@@ -217,15 +355,17 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    await _googleSignIn.signOut();
-    _user = null;
-    _remoteUser = null;
     if (kIsWeb) {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('wasSignedIn', false);
-      } catch (_) {}
+      await fb.FirebaseAuth.instance.signOut();
+    } else {
+      await _googleSignIn.signOut();
+      _user = null;
     }
+    _remoteUser = null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('wasSignedIn', false);
+    } catch (_) {}
     notifyListeners();
   }
 
@@ -233,6 +373,35 @@ class AuthService extends ChangeNotifier {
   /// account and updates the cached `_remoteUser`. Safe to call when not
   /// signed-in (it will do nothing).
   Future<void> refreshRemoteUser() async {
+    if (kIsWeb) {
+      final u = fb.FirebaseAuth.instance.currentUser;
+      if (u == null) return;
+      try {
+        final providerUid = _webGoogleProviderUid;
+        final backendId = providerUid ?? u.uid;
+        String name = u.displayName ?? '';
+        if (name.trim().isEmpty) {
+          for (final p in u.providerData) {
+            if (p.providerId == 'google.com' &&
+                p.displayName != null &&
+                p.displayName!.trim().isNotEmpty) {
+              name = p.displayName!;
+              break;
+            }
+          }
+        }
+        final remote = await getUser(
+          id: backendId,
+          email: u.email ?? '',
+          name: name,
+        );
+        _remoteUser = remote;
+        notifyListeners();
+      } catch (e) {
+        debugPrint('[Auth] refreshRemoteUser (web) failed: $e');
+      }
+      return;
+    }
     final acct = _user;
     if (acct == null) return;
     try {

@@ -90,7 +90,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
               // positive songRequestCount. If remoteUser is not yet fetched we
               // keep the button disabled to avoid accidental submits.
               onPressed:
-                  (auth.user != null &&
+                  (auth.isSignedIn &&
                       auth.remoteUser != null &&
                       (songRequestCount != null && songRequestCount > 0))
                   ? () => _showAddSongDialog(context)
@@ -99,7 +99,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
               label: Text('Add Song'),
               style: ElevatedButton.styleFrom(
                 backgroundColor:
-                    (auth.user != null &&
+                    (auth.isSignedIn &&
                         auth.remoteUser != null &&
                         (songRequestCount != null && songRequestCount > 0))
                     ? kGold
@@ -132,7 +132,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
               ],
             ),
             const SizedBox(height: 12),
-          ] else if (auth.user != null) ...[
+          ] else if (auth.isSignedIn) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -214,11 +214,11 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                       // User can upvote only when signed in, remoteUser has been
                       // fetched, and they have upvotes remaining (>0).
                       final canUpvote =
-                          auth.user != null &&
+                          auth.isSignedIn &&
                           auth.remoteUser != null &&
                           (songUpvoteCount != null && songUpvoteCount > 0);
                       final id = (s['id'] ?? '').toString();
-                      final userEmail = canUpvote ? auth.user!.email : '';
+                      final userEmail = canUpvote ? (auth.email ?? '') : '';
 
                       final card = _SongCard(
                         title: name,
@@ -250,7 +250,12 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   return;
                                 }
 
-                                final progressNavigator = Navigator.of(context);
+                                // Use the root navigator for the progress overlay so we can
+                                // reliably dismiss it across all browsers (Safari quirk).
+                                final progressNavigator = Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                );
                                 final messenger = ScaffoldMessenger.of(context);
 
                                 showDialog<void>(
@@ -323,9 +328,13 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   // the backend succeeded. Mirror the optimistic handling used
                                   // for add/delete: close progress, refresh list and counters,
                                   // and inform the user.
-                                  final isBrowserFetchError = e
-                                      .toString()
-                                      .contains('Failed to fetch');
+                                  final msg = e.toString();
+                                  final isBrowserFetchError =
+                                      msg.contains('Failed to fetch') ||
+                                      msg.contains('TimeoutException') ||
+                                      msg.contains('NetworkError') ||
+                                      msg.contains('XMLHttpRequest error') ||
+                                      msg.contains('TypeError');
                                   if (kIsWeb && isBrowserFetchError) {
                                     try {
                                       progressNavigator.pop();
@@ -501,7 +510,11 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                           return;
                         }
 
-                        final progressNavigator = Navigator.of(context);
+                        // Root navigator for the spinner overlay
+                        final progressNavigator = Navigator.of(
+                          context,
+                          rootNavigator: true,
+                        );
                         final deleteNavigator = Navigator.of(ctx);
                         final messenger = ScaffoldMessenger.of(context);
 
@@ -536,9 +549,13 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                           // Similar to add-song, on web the browser may report
                           // "Failed to fetch" even if the function succeeded.
                           // Handle optimistically to keep UI responsive.
-                          final isBrowserFetchError = e.toString().contains(
-                            'Failed to fetch',
-                          );
+                          final msg = e.toString();
+                          final isBrowserFetchError =
+                              msg.contains('Failed to fetch') ||
+                              msg.contains('TimeoutException') ||
+                              msg.contains('NetworkError') ||
+                              msg.contains('XMLHttpRequest error') ||
+                              msg.contains('TypeError');
                           if (kIsWeb && isBrowserFetchError) {
                             try {
                               progressNavigator.pop();
@@ -601,7 +618,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
 
   Future<void> _showAddSongDialog(BuildContext context) async {
     final auth = Provider.of<AuthService>(context, listen: false);
-    final userEmail = auth.user?.email ?? 'Anonymous';
+    final userEmail = auth.email ?? 'Anonymous';
 
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController();
@@ -727,10 +744,12 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   }
                                   final artist = artistCtrl.text.trim();
                                   final name = nameCtrl.text.trim();
-                                  final creatorEmail = auth.user?.email ?? '';
+                                  final creatorEmail = auth.email ?? '';
 
+                                  // Root navigator for the spinner overlay
                                   final progressNavigator = Navigator.of(
                                     context,
+                                    rootNavigator: true,
                                   );
                                   final addSongNavigator = Navigator.of(ctx);
                                   final messenger = ScaffoldMessenger.of(
@@ -812,9 +831,13 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     // completed. Since we've seen the song actually get added,
                                     // treat this specific case optimistically: close the dialog,
                                     // refresh the list, and inform the user.
-                                    final isBrowserFetchError = e
-                                        .toString()
-                                        .contains('Failed to fetch');
+                                    final msg = e.toString();
+                                    final isBrowserFetchError =
+                                        msg.contains('Failed to fetch') ||
+                                        msg.contains('TimeoutException') ||
+                                        msg.contains('NetworkError') ||
+                                        msg.contains('XMLHttpRequest error') ||
+                                        msg.contains('TypeError');
                                     if (kIsWeb && isBrowserFetchError) {
                                       try {
                                         progressNavigator.pop();

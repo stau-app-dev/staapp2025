@@ -90,6 +90,8 @@ class _LoginPageState extends State<LoginPage> {
                         if (success) {
                           navigator.pop();
                         } else {
+                          // On web, if we switched to redirect sign-in, the page may reload.
+                          // Provide a brief hint to the user before returning.
                           messenger.showSnackBar(
                             SnackBar(
                               content: Text(errorMessage ?? 'Sign in failed'),

@@ -9,10 +9,9 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthService>(context);
-    final user = auth.user;
-    final displayName = user?.displayName ?? '';
-    final email = user?.email ?? '';
-    final photoUrl = user?.photoUrl;
+    final displayName = auth.displayName ?? '';
+    final email = auth.email ?? '';
+    final photoUrl = auth.photoUrl;
 
     // Helper to derive a deterministic pastel color from a string (name/email)
     Color deterministicPastel(String key) {

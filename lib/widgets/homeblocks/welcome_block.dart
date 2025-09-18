@@ -63,7 +63,7 @@ class _WelcomeBlockState extends State<WelcomeBlock> {
                     Builder(
                       builder: (context) {
                         final auth = Provider.of<AuthService>(context);
-                        final displayName = auth.user?.displayName;
+                        final displayName = auth.displayName;
                         String? firstName;
                         if (displayName != null &&
                             displayName.trim().isNotEmpty) {
