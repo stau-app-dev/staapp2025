@@ -16,6 +16,37 @@ class SongRequestsPage extends StatefulWidget {
 class _SongRequestsPageState extends State<SongRequestsPage> {
   late Future<List<Map<String, dynamic>>> _songsFuture;
 
+  // Simple, robust progress overlay that doesn't rely on Navigator.
+  OverlayEntry? _progressOverlay;
+  void _showProgressOverlay(BuildContext context) {
+    if (_progressOverlay != null) return;
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) return;
+    _progressOverlay = OverlayEntry(
+      builder: (_) => Stack(
+        children: [
+          Positioned.fill(child: Container(color: Colors.black54)),
+          const Center(child: CircularProgressIndicator()),
+        ],
+      ),
+    );
+    overlay.insert(_progressOverlay!);
+  }
+
+  void _hideProgressOverlay() {
+    void removeOnce() {
+      try {
+        _progressOverlay?.remove();
+      } catch (_) {}
+      _progressOverlay = null;
+    }
+
+    // Remove now, on next frame, and after a short delay to be extra safe.
+    removeOnce();
+    WidgetsBinding.instance.addPostFrameCallback((_) => removeOnce());
+    Future.delayed(const Duration(milliseconds: 60), removeOnce);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -250,21 +281,8 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   return;
                                 }
 
-                                // Use the root navigator for the progress overlay so we can
-                                // reliably dismiss it across all browsers (Safari quirk).
-                                final progressNavigator = Navigator.of(
-                                  context,
-                                  rootNavigator: true,
-                                );
                                 final messenger = ScaffoldMessenger.of(context);
-
-                                showDialog<void>(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder: (_) => const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                );
+                                _showProgressOverlay(context);
 
                                 try {
                                   // Defensive re-check: ensure the remote user still has
@@ -281,9 +299,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   }
                                   if (remainingUpvotes != null &&
                                       remainingUpvotes <= 0) {
-                                    try {
-                                      progressNavigator.pop();
-                                    } catch (_) {}
+                                    _hideProgressOverlay();
                                     messenger.showSnackBar(
                                       SnackBar(
                                         content: Text(
@@ -309,21 +325,34 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   try {
                                     await auth.refreshRemoteUser();
                                   } catch (_) {}
-                                  progressNavigator.pop();
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Upvoted!',
-                                        style: kBodyText,
+                                  _hideProgressOverlay();
+                                  // Ensure the overlay is gone before showing the snackbar
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Upvoted!',
+                                          style: kBodyText,
+                                        ),
                                       ),
-                                    ),
-                                  );
+                                    );
+                                  });
                                 } catch (e, st) {
                                   // Log details to help diagnose web fetch issues.
                                   debugPrint(
                                     '[SongRequests] upvoteSong error: ${e.toString()}',
                                   );
-                                  debugPrintStack(stackTrace: st);
+                                  try {
+                                    if (!kIsWeb) {
+                                      debugPrintStack(stackTrace: st);
+                                    } else {
+                                      debugPrint('[stack] $st');
+                                    }
+                                  } catch (_) {
+                                    debugPrint('[stack print failed]');
+                                  }
                                   // On web, the browser may report "Failed to fetch" even when
                                   // the backend succeeded. Mirror the optimistic handling used
                                   // for add/delete: close progress, refresh list and counters,
@@ -336,9 +365,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                       msg.contains('XMLHttpRequest error') ||
                                       msg.contains('TypeError');
                                   if (kIsWeb && isBrowserFetchError) {
-                                    try {
-                                      progressNavigator.pop();
-                                    } catch (_) {}
+                                    _hideProgressOverlay();
                                     if (mounted) {
                                       setState(() {
                                         _songsFuture = fetchSongs();
@@ -357,17 +384,19 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     );
                                     return;
                                   }
-                                  try {
-                                    progressNavigator.pop();
-                                  } catch (_) {}
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Failed to upvote: ${e.toString()}',
-                                        style: kBodyText,
+                                  _hideProgressOverlay();
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to upvote: ${e.toString()}',
+                                          style: kBodyText,
+                                        ),
                                       ),
-                                    ),
-                                  );
+                                    );
+                                  });
                                 }
                               }
                             : null,
@@ -421,7 +450,17 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                     Align(
                       alignment: Alignment.topRight,
                       child: GestureDetector(
-                        onTap: () => Navigator.of(ctx).pop(),
+                        onTap: () {
+                          final rootNav = Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          );
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            try {
+                              rootNav.pop();
+                            } catch (_) {}
+                          });
+                        },
                         child: Icon(Icons.close, color: kGold),
                       ),
                     ),
@@ -510,19 +549,13 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                           return;
                         }
 
-                        // Root navigator for the spinner overlay
-                        final progressNavigator = Navigator.of(
+                        // Show global progress overlay (dismissed via _hideProgressOverlay)
+                        _showProgressOverlay(context);
+                        final messenger = ScaffoldMessenger.of(context);
+                        // Capture the root navigator now to avoid context lookups later
+                        final rootNav = Navigator.of(
                           context,
                           rootNavigator: true,
-                        );
-                        final deleteNavigator = Navigator.of(ctx);
-                        final messenger = ScaffoldMessenger.of(context);
-
-                        showDialog<void>(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (_) =>
-                              const Center(child: CircularProgressIndicator()),
                         );
 
                         try {
@@ -534,18 +567,30 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                           try {
                             await auth.refreshRemoteUser();
                           } catch (_) {}
-                          progressNavigator.pop();
-                          deleteNavigator.pop();
-                          messenger.showSnackBar(
-                            SnackBar(
-                              content: Text('Song deleted', style: kBodyText),
-                            ),
-                          );
+                          _hideProgressOverlay();
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            try {
+                              rootNav.pop();
+                            } catch (_) {}
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Song deleted', style: kBodyText),
+                              ),
+                            );
+                          });
                         } catch (e, st) {
                           debugPrint(
                             '[SongRequests] deleteSong error: ${e.toString()}',
                           );
-                          debugPrintStack(stackTrace: st);
+                          try {
+                            if (!kIsWeb) {
+                              debugPrintStack(stackTrace: st);
+                            } else {
+                              debugPrint('[stack] $st');
+                            }
+                          } catch (_) {
+                            debugPrint('[stack print failed]');
+                          }
                           // Similar to add-song, on web the browser may report
                           // "Failed to fetch" even if the function succeeded.
                           // Handle optimistically to keep UI responsive.
@@ -557,12 +602,12 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                               msg.contains('XMLHttpRequest error') ||
                               msg.contains('TypeError');
                           if (kIsWeb && isBrowserFetchError) {
-                            try {
-                              progressNavigator.pop();
-                            } catch (_) {}
-                            try {
-                              deleteNavigator.pop();
-                            } catch (_) {}
+                            _hideProgressOverlay();
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              try {
+                                rootNav.pop();
+                              } catch (_) {}
+                            });
                             if (mounted) {
                               setState(() {
                                 _songsFuture = fetchSongs();
@@ -581,17 +626,17 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                             );
                             return;
                           }
-                          try {
-                            progressNavigator.pop();
-                          } catch (_) {}
-                          messenger.showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Failed to delete song: ${e.toString()}',
-                                style: kBodyText,
+                          _hideProgressOverlay();
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Failed to delete song: ${e.toString()}',
+                                  style: kBodyText,
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          });
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -645,7 +690,17 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                     Align(
                       alignment: Alignment.topRight,
                       child: GestureDetector(
-                        onTap: () => Navigator.of(ctx).pop(),
+                        onTap: () {
+                          final rootNav = Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          );
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            try {
+                              rootNav.pop();
+                            } catch (_) {}
+                          });
+                        },
                         child: Icon(Icons.close, color: kGold),
                       ),
                     ),
@@ -746,22 +801,15 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   final name = nameCtrl.text.trim();
                                   final creatorEmail = auth.email ?? '';
 
-                                  // Root navigator for the spinner overlay
-                                  final progressNavigator = Navigator.of(
-                                    context,
-                                    rootNavigator: true,
-                                  );
-                                  final addSongNavigator = Navigator.of(ctx);
+                                  // Show global progress overlay (dismissed via _hideProgressOverlay)
+                                  _showProgressOverlay(context);
                                   final messenger = ScaffoldMessenger.of(
                                     context,
                                   );
-
-                                  showDialog<void>(
-                                    context: context,
-                                    barrierDismissible: false,
-                                    builder: (_) => const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
+                                  // Capture root navigator now; avoid context lookups later
+                                  final rootNav = Navigator.of(
+                                    context,
+                                    rootNavigator: true,
                                   );
 
                                   try {
@@ -780,9 +828,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                       debugPrint(
                                         '[SongRequests] Add song blocked: no song requests left for user',
                                       );
-                                      try {
-                                        progressNavigator.pop();
-                                      } catch (_) {}
+                                      _hideProgressOverlay();
                                       messenger.showSnackBar(
                                         SnackBar(
                                           content: Text(
@@ -811,21 +857,34 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     try {
                                       await auth.refreshRemoteUser();
                                     } catch (_) {}
-                                    progressNavigator.pop();
-                                    addSongNavigator.pop();
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Song submitted — thank you!',
-                                          style: kBodyText,
-                                        ),
-                                      ),
-                                    );
+                                    _hideProgressOverlay();
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          try {
+                                            rootNav.pop();
+                                          } catch (_) {}
+                                          messenger.showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                'Song submitted — thank you!',
+                                                style: kBodyText,
+                                              ),
+                                            ),
+                                          );
+                                        });
                                   } catch (e, st) {
                                     debugPrint(
                                       '[SongRequests] submitSong error: ${e.toString()}',
                                     );
-                                    debugPrintStack(stackTrace: st);
+                                    try {
+                                      if (!kIsWeb) {
+                                        debugPrintStack(stackTrace: st);
+                                      } else {
+                                        debugPrint('[stack] $st');
+                                      }
+                                    } catch (_) {
+                                      debugPrint('[stack print failed]');
+                                    }
                                     // On web, a CORS/preflight issue can cause the browser
                                     // client to report "Failed to fetch" even if the Cloud Function
                                     // completed. Since we've seen the song actually get added,
@@ -839,12 +898,13 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                         msg.contains('XMLHttpRequest error') ||
                                         msg.contains('TypeError');
                                     if (kIsWeb && isBrowserFetchError) {
-                                      try {
-                                        progressNavigator.pop();
-                                      } catch (_) {}
-                                      try {
-                                        addSongNavigator.pop();
-                                      } catch (_) {}
+                                      _hideProgressOverlay();
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                            try {
+                                              rootNav.pop();
+                                            } catch (_) {}
+                                          });
                                       if (mounted) {
                                         setState(() {
                                           _songsFuture = fetchSongs();
@@ -863,17 +923,19 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                       );
                                       return;
                                     }
-                                    try {
-                                      progressNavigator.pop();
-                                    } catch (_) {}
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Failed to submit song: ${e.toString()}',
-                                          style: kBodyText,
+                                    _hideProgressOverlay();
+                                    WidgetsBinding.instance.addPostFrameCallback((
+                                      _,
+                                    ) {
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text(
+                                            'Failed to submit song: ${e.toString()}',
+                                            style: kBodyText,
+                                          ),
                                         ),
-                                      ),
-                                    );
+                                      );
+                                    });
                                   }
                                 },
                                 style: ElevatedButton.styleFrom(
