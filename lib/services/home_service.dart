@@ -10,9 +10,9 @@ Future<List<Map<String, String>>> fetchAnnouncements({
 }) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getGeneralAnnouncements',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/getGeneralAnnouncements?t=${DateTime.now().millisecondsSinceEpoch}',
   );
-  final resp = await client.get(url).timeout(Duration(seconds: 6));
+  final resp = await client.get(url).timeout(Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load announcements');
   final body = json.decode(resp.body);
   return parseAnnouncementsFromJson(body);
@@ -22,9 +22,9 @@ Future<List<Map<String, String>>> fetchAnnouncements({
 Future<String?> fetchVerseOfDay({http.Client? client}) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getVerseOfDay',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/getVerseOfDay?t=${DateTime.now().millisecondsSinceEpoch}',
   );
-  final resp = await client.get(url).timeout(Duration(seconds: 6));
+  final resp = await client.get(url).timeout(Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load verse');
   final body = json.decode(resp.body);
   if (body is Map && body['data'] is Map) {
@@ -40,9 +40,9 @@ Future<String?> fetchVerseOfDay({http.Client? client}) async {
 Future<Map<String, dynamic>> fetchSpiritMeters({http.Client? client}) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getSpiritMeters',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/getSpiritMeters?t=${DateTime.now().millisecondsSinceEpoch}',
   );
-  final resp = await client.get(url).timeout(Duration(seconds: 6));
+  final resp = await client.get(url).timeout(Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load spirit meters');
   final body = json.decode(resp.body);
   if (body is Map && body['data'] is Map) {
@@ -55,9 +55,9 @@ Future<Map<String, dynamic>> fetchSpiritMeters({http.Client? client}) async {
 Future<int?> fetchDayNumber({http.Client? client}) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getDayNumber',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/getDayNumber?t=${DateTime.now().millisecondsSinceEpoch}',
   );
-  final resp = await client.get(url).timeout(Duration(seconds: 6));
+  final resp = await client.get(url).timeout(Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load day number');
   final body = json.decode(resp.body);
   if (body is Map && body['data'] is Map) {
@@ -74,9 +74,9 @@ Future<int?> fetchDayNumber({http.Client? client}) async {
 Future<String?> fetchAnnouncementFormUrl({http.Client? client}) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getAnnouncementFormUrl',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/getAnnouncementFormUrl?t=${DateTime.now().millisecondsSinceEpoch}',
   );
-  final resp = await client.get(url).timeout(Duration(seconds: 6));
+  final resp = await client.get(url).timeout(Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load form url');
   final body = json.decode(resp.body);
   if (body is Map && body['data'] is Map) {
@@ -96,15 +96,9 @@ Future<List<Map<String, dynamic>>> fetchSongs({http.Client? client}) async {
   final url = Uri.parse(
     'https://us-central1-staugustinechsapp.cloudfunctions.net/getSongs?t=${DateTime.now().millisecondsSinceEpoch}',
   );
-  final resp = await client
-      .get(
-        url,
-        headers: {
-          'Cache-Control': 'no-cache, no-store, max-age=0',
-          'Pragma': 'no-cache',
-        },
-      )
-      .timeout(Duration(seconds: 12));
+  // Avoid adding custom request headers on GET to prevent CORS preflight
+  // (notably problematic on iOS Firefox). Cache-busting query param suffices.
+  final resp = await client.get(url).timeout(Duration(seconds: 12));
   if (resp.statusCode != 200) throw Exception('Failed to load songs');
   final body = json.decode(resp.body);
   if (body is Map && body['data'] is List) {
