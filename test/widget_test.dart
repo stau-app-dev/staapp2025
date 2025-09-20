@@ -8,7 +8,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:staapp2025/widgets/homeblocks/homeblocks.dart';
+import 'package:staapp2025/features/home/ui/homeblocks.dart';
 
 void main() {
   testWidgets('App builds', (WidgetTester tester) async {

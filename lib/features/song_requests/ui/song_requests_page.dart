@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:staapp2025/common/styles.dart';
-import 'package:staapp2025/features/song_requests/data/song_requests_service.dart';
+import 'package:staapp2025/core/firebase_functions.dart' as fns;
 import 'package:provider/provider.dart';
 import 'package:staapp2025/features/auth/auth_service.dart';
 import 'package:staapp2025/features/song_requests/data/profanity.dart';
@@ -51,7 +51,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
   @override
   void initState() {
     super.initState();
-    _songsFuture = fetchSongs();
+    _songsFuture = fns.fetchSongs();
     // When this page is first created, ensure we refresh the remote user
     // profile so counters (songRequestCount/songUpvoteCount) are available
     // as soon as possible.
@@ -73,7 +73,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
 
     // Reload songs from the server and wait for the result so the
     // RefreshIndicator's spinner correlates with network activity.
-    final future = fetchSongs();
+    final future = fns.fetchSongs();
     setState(() {
       _songsFuture = future;
     });
@@ -112,8 +112,11 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
           Center(
             child: ElevatedButton.icon(
               onPressed: () async {
+                // Capture messenger before any awaits to avoid using context after async gaps.
+                final messenger = ScaffoldMessenger.of(context);
                 // Ensure the user is signed in; if not, show login.
                 final ok = await ensureSignedIn(context);
+                if (!context.mounted) return;
                 if (!ok) return;
                 final auth = Provider.of<AuthService>(context, listen: false);
                 // Refresh remote user to ensure we have up-to-date counters.
@@ -122,13 +125,14 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                 } catch (_) {}
                 final remaining = auth.songRequestCount ?? 0;
                 if (remaining <= 0) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text('No song requests left', style: kBodyText),
                     ),
                   );
                   return;
                 }
+                if (!context.mounted) return;
                 _showAddSongDialog(context);
               },
               icon: const Icon(Icons.add),
@@ -252,7 +256,10 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                         subtitle: 'By: $artist',
                         upvotes: upvotes,
                         onUpvote: () async {
+                          // Capture messenger as early as possible
+                          final messenger = ScaffoldMessenger.of(context);
                           final ok = await ensureSignedIn(context);
+                          if (!context.mounted) return;
                           if (!ok) return;
                           final auth = Provider.of<AuthService>(
                             context,
@@ -262,7 +269,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                             await auth.refreshRemoteUser();
                           } catch (_) {}
                           if (id.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            messenger.showSnackBar(
                               SnackBar(
                                 content: Text(
                                   'Missing song id',
@@ -274,7 +281,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                           }
                           final userEmail = auth.email ?? '';
                           if (userEmail.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
+                            messenger.showSnackBar(
                               SnackBar(
                                 content: Text(
                                   'Missing user email',
@@ -284,8 +291,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                             );
                             return;
                           }
-
-                          final messenger = ScaffoldMessenger.of(context);
+                          if (!context.mounted) return;
                           _showProgressOverlay(context);
                           try {
                             final remainingUpvotes = auth.songUpvoteCount ?? 0;
@@ -302,10 +308,13 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                               return;
                             }
 
-                            await upvoteSong(songId: id, userEmail: userEmail);
-                            if (!mounted) return;
+                            await fns.upvoteSong(
+                              songId: id,
+                              userEmail: userEmail,
+                            );
+                            if (!context.mounted) return;
                             setState(() {
-                              _songsFuture = fetchSongs();
+                              _songsFuture = fns.fetchSongs();
                             });
                             try {
                               await auth.refreshRemoteUser();
@@ -342,7 +351,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                               _hideProgressOverlay();
                               if (mounted) {
                                 setState(() {
-                                  _songsFuture = fetchSongs();
+                                  _songsFuture = fns.fetchSongs();
                                 });
                               }
                               try {
@@ -495,8 +504,13 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                     ElevatedButton(
                       onPressed: () async {
                         if (!isAdmin) {
-                          Navigator.of(ctx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          final rootNav = Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          );
+                          rootNav.pop();
+                          final messenger = ScaffoldMessenger.of(context);
+                          messenger.showSnackBar(
                             SnackBar(
                               content: Text(
                                 'Only admins can delete songs',
@@ -508,8 +522,13 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                         }
                         final id = (song['id'] ?? '').toString();
                         if (id.isEmpty) {
-                          Navigator.of(ctx).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          final rootNav = Navigator.of(
+                            context,
+                            rootNavigator: true,
+                          );
+                          rootNav.pop();
+                          final messenger = ScaffoldMessenger.of(context);
+                          messenger.showSnackBar(
                             SnackBar(
                               content: Text(
                                 'Missing song id',
@@ -530,10 +549,10 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                         );
 
                         try {
-                          await deleteSong(id: id);
+                          await fns.deleteSong(id: id);
                           if (!mounted) return;
                           setState(() {
-                            _songsFuture = fetchSongs();
+                            _songsFuture = fns.fetchSongs();
                           });
                           try {
                             await auth.refreshRemoteUser();
@@ -581,7 +600,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                             });
                             if (mounted) {
                               setState(() {
-                                _songsFuture = fetchSongs();
+                                _songsFuture = fns.fetchSongs();
                               });
                             }
                             try {
@@ -811,7 +830,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                       return;
                                     }
 
-                                    await submitSong(
+                                    await fns.submitSong(
                                       artist: artist,
                                       name: name,
                                       creatorEmail: creatorEmail,
@@ -819,11 +838,9 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     debugPrint(
                                       '[SongRequests] submitSong success: name="$name", artist="$artist", creator="$creatorEmail"',
                                     );
-                                    if (!mounted) {
-                                      return;
-                                    }
+                                    if (!mounted) return;
                                     setState(() {
-                                      _songsFuture = fetchSongs();
+                                      _songsFuture = fns.fetchSongs();
                                     });
                                     try {
                                       await auth.refreshRemoteUser();
@@ -878,7 +895,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                           });
                                       if (mounted) {
                                         setState(() {
-                                          _songsFuture = fetchSongs();
+                                          _songsFuture = fns.fetchSongs();
                                         });
                                       }
                                       try {

@@ -18,13 +18,14 @@ Key code areas:
 	- `theme.dart` – Source-of-truth `ThemeData`
 - `lib/core/` – App bootstrap and platform glue
 	- `firebase_bootstrap.dart` – Cross-platform Firebase init
+	- `firebase_functions.dart` – Canonical Cloud Functions HTTP wrappers used by features and tests
 - `lib/features/` – Feature-first modules
 	- `home/` → Home page + blocks (`ui/`), data (`data/`)
 	- `song_requests/` → `SongRequestsPage` (`ui/`), data service (`data/`)
 	- `profile/` → `ProfilePage` (`ui/`)
 	- `auth/` → `AuthService`, `ensureSignedIn` (`guard.dart`), `LoginPage` (`ui/`)
-- `lib/widgets/` – Reusable widgets (e.g., error cards, homeblocks)
-- `lib/services/` – HTTP/data access (to be folded under features/*/data later)
+- `lib/widgets/` – (Removed in refactor) Reusable widgets moved under `lib/common/widgets/`
+- `lib/services/` – (Removed in refactor) Legacy forwarders eliminated in favor of `lib/core/firebase_functions.dart`
 - `lib/features/song_requests/data/profanity.dart` – Profanity list and helpers (client-side UX only)
 	(Note: `lib/consts.dart` remains as a forward export for backward compatibility.)
 
@@ -106,6 +107,19 @@ Select a different device with `flutter devices` and then `flutter run -d <devic
 ## Profanity filtering
 
 Client-side filtering in `lib/consts.dart` improves form UX (normalization + pattern checks). Treat server-side validation as the source of truth if you add a backend.
+
+## Data layer and forwarders (2025‑09)
+
+- Single source of truth for all Cloud Function calls lives in `lib/core/firebase_functions.dart`.
+- Features and UI import and call functions from `core/firebase_functions.dart` directly (no feature-level data forwarders).
+- Tests also import `core/firebase_functions.dart` and can inject a `http.Client` to mock responses.
+- Legacy forwarders and barrels were removed to reduce indirection:
+	- Removed: `lib/services/` (barrels)
+	- Removed: `lib/features/home/data/home_service.dart`
+	- Removed: `lib/features/auth/data/user_service.dart`
+	- Removed: `lib/features/song_requests/data/song_requests_service.dart`
+	- Moved: `lib/widgets/error_card.dart` → `lib/common/widgets/error_card.dart`
+
 
 ## Security and secrets
 

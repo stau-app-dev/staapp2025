@@ -4,11 +4,11 @@ import 'core/firebase_bootstrap.dart';
 // You can still import shared styles/theme directly, or via common/ barrels.
 import 'common/styles.dart';
 import 'common/theme.dart';
-// Feature barrels (new structure) that re-export existing pages/widgets.
-import 'package:staapp2025/features/home/home.dart';
-import 'package:staapp2025/widgets/homeblocks/homeblocks.dart';
-import 'package:staapp2025/features/song_requests/song_requests.dart';
-import 'package:staapp2025/features/profile/profile.dart';
+// Feature UI imports (direct, after removing forwarder files)
+import 'package:staapp2025/features/home/ui/home.dart';
+import 'package:staapp2025/features/home/ui/homeblocks.dart';
+import 'package:staapp2025/features/song_requests/ui/song_requests_page.dart';
+import 'package:staapp2025/features/profile/ui/profile_page.dart';
 import 'package:provider/provider.dart';
 import 'package:staapp2025/features/auth/auth_service.dart';
 import 'package:staapp2025/features/auth/guard.dart';

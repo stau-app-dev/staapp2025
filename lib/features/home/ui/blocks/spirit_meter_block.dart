@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staapp2025/common/styles.dart';
-import 'package:staapp2025/widgets/error_card.dart';
-import 'package:staapp2025/features/home/data.dart';
+import 'package:staapp2025/common/widgets/error_card.dart';
+import 'package:staapp2025/core/firebase_functions.dart' as fns;
 
 class SpiritMeterBlock extends StatefulWidget {
   const SpiritMeterBlock({super.key});
@@ -36,7 +36,7 @@ class _SpiritMeterBlockState extends State<SpiritMeterBlock> {
 
   Future<void> _fetchSpiritMeters() async {
     try {
-      final data = await fetchSpiritMeters();
+      final data = await fns.fetchSpiritMeters();
       setState(() {
         _spiritLevels = {
           '9': _clampToUnit(data['nine']),

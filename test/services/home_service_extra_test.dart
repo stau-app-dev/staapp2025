@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'dart:convert';
 
-import 'package:staapp2025/services/home_service.dart';
+import 'package:staapp2025/core/firebase_functions.dart' as fns;
 
 void main() {
   test('fetchSpiritMeters returns map with grade keys', () async {
@@ -14,7 +14,7 @@ void main() {
       return http.Response(mockResponse, 200);
     });
 
-    final map = await fetchSpiritMeters(client: client);
+    final map = await fns.fetchSpiritMeters(client: client);
     expect(map['nine'], 42);
     expect(map['ten'], 55);
     expect(map['eleven'], 63);
@@ -29,7 +29,7 @@ void main() {
       return http.Response(mockResponse, 200);
     });
 
-    final dn = await fetchDayNumber(client: client);
+    final dn = await fns.fetchDayNumber(client: client);
     expect(dn, 2);
   });
 }

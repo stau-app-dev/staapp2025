@@ -3,8 +3,8 @@ import 'package:staapp2025/common/styles.dart';
 import 'package:provider/provider.dart';
 import 'package:staapp2025/features/auth/auth_service.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:staapp2025/widgets/error_card.dart';
-import 'package:staapp2025/features/home/data.dart';
+import 'package:staapp2025/common/widgets/error_card.dart';
+import 'package:staapp2025/core/firebase_functions.dart' as fns;
 import 'dart:async';
 import 'package:staapp2025/features/auth/guard.dart';
 
@@ -47,7 +47,7 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
 
   Future<void> _fetchAnnouncements() async {
     try {
-      final parsed = await fetchAnnouncements();
+      final parsed = await fns.fetchAnnouncements();
       if (parsed.isNotEmpty) {
         setState(() {
           announcements = parsed;
@@ -129,7 +129,10 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
             Center(
               child: ElevatedButton.icon(
                 onPressed: () async {
+                  // Capture messenger before any awaits to avoid using context across async gaps
+                  final messenger = ScaffoldMessenger.of(context);
                   final ok = await ensureSignedIn(context);
+                  if (!context.mounted) return;
                   if (!ok) return;
                   final authNow = Provider.of<AuthService>(
                     context,
@@ -137,7 +140,7 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
                   );
                   final emailNow = (authNow.email ?? '').toLowerCase();
                   if (!emailNow.endsWith('ycdsb.ca')) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(
                         content: Text(
                           'Only staff (ycdsb.ca) can add announcements.',
@@ -146,9 +149,8 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
                     );
                     return;
                   }
-                  final messenger = ScaffoldMessenger.of(context);
                   try {
-                    final url = await fetchAnnouncementFormUrl();
+                    final url = await fns.fetchAnnouncementFormUrl();
                     if (url == null || url.trim().isEmpty) {
                       messenger.showSnackBar(
                         SnackBar(content: Text('Form URL unavailable')),

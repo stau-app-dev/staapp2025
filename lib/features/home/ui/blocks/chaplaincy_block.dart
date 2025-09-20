@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:staapp2025/common/styles.dart';
-import 'package:staapp2025/widgets/error_card.dart';
-import 'package:staapp2025/features/home/data.dart';
+import 'package:staapp2025/common/widgets/error_card.dart';
+import 'package:staapp2025/core/firebase_functions.dart' as fns;
 
 class ChaplaincyBlock extends StatefulWidget {
   const ChaplaincyBlock({super.key});
@@ -34,7 +34,7 @@ class _ChaplaincyBlockState extends State<ChaplaincyBlock> {
 
   Future<void> _fetchVerse() async {
     try {
-      final v = await fetchVerseOfDay();
+      final v = await fns.fetchVerseOfDay();
       setState(() {
         _verse = _decodeHtmlEntities(v ?? _verse);
         _loading = false;

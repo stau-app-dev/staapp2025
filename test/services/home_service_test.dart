@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'dart:convert';
 
-import 'package:staapp2025/services/home_service.dart';
+import 'package:staapp2025/core/firebase_functions.dart' as fns;
 
 void main() {
   test('fetchAnnouncements returns parsed list on success', () async {
@@ -17,7 +17,7 @@ void main() {
       return http.Response(mockResponse, 200);
     });
 
-    final list = await fetchAnnouncements(client: client);
+    final list = await fns.fetchAnnouncements(client: client);
     expect(list, isA<List<Map<String, String>>>());
     expect(list.length, 2);
     expect(list[0]['title'], 'A');
@@ -31,7 +31,7 @@ void main() {
       return http.Response(mockResponse, 200);
     });
 
-    final v = await fetchVerseOfDay(client: client);
+    final v = await fns.fetchVerseOfDay(client: client);
     expect(v, 'A short verse');
   });
 
@@ -41,7 +41,7 @@ void main() {
       return http.Response(mockResponse, 200);
     });
 
-    final v = await fetchVerseOfDay(client: client);
+    final v = await fns.fetchVerseOfDay(client: client);
     expect(v, isNull);
   });
 }

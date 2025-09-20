@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart' as fcore;
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 // Replace legacy services import with the new auth data service
-import 'package:staapp2025/features/auth/data/user_service.dart';
+import 'package:staapp2025/core/firebase_functions.dart' as fns;
 
 class AuthService extends ChangeNotifier {
   // Ensure Firebase is initialized before using any Firebase services.
@@ -190,7 +190,7 @@ class AuthService extends ChangeNotifier {
               }
             }
           }
-          final remote = await getUser(
+          final remote = await fns.getUser(
             id: backendId,
             email: email ?? '',
             name: name,
@@ -315,7 +315,7 @@ class AuthService extends ChangeNotifier {
           }
         }
       }
-      final remote = await getUser(
+      final remote = await fns.getUser(
         id: backendId,
         email: u.email ?? '',
         name: name,

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:staapp2025/widgets/homeblocks/homeblocks.dart';
+import 'package:staapp2025/features/home/ui/homeblocks.dart';
 
 void main() {
   test('decodeHtmlEntities handles common entities', () {

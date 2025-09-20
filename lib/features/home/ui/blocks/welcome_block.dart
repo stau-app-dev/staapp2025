@@ -3,7 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:staapp2025/common/styles.dart';
 import 'package:provider/provider.dart';
 import 'package:staapp2025/features/auth/auth_service.dart';
-import 'package:staapp2025/features/home/data.dart';
+import 'package:staapp2025/core/firebase_functions.dart' as fns;
 
 class WelcomeBlock extends StatefulWidget {
   const WelcomeBlock({super.key});
@@ -24,7 +24,7 @@ class _WelcomeBlockState extends State<WelcomeBlock> {
 
   Future<void> _fetchDayNumber() async {
     try {
-      final dn = await fetchDayNumber();
+      final dn = await fns.fetchDayNumber();
       setState(() {
         dayNumber = dn;
         loading = false;
@@ -79,9 +79,11 @@ class _WelcomeBlockState extends State<WelcomeBlock> {
                       },
                     ),
                     SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (loading) ...[
+                    // Day indicator line: show spinner while loading, show text when
+                    // dayNumber is available, and hide entirely when dayNumber is null.
+                    if (loading) ...[
+                      Row(
+                        children: [
                           SizedBox(
                             width: 14,
                             height: 14,
@@ -90,39 +92,45 @@ class _WelcomeBlockState extends State<WelcomeBlock> {
                               color: kWhite,
                             ),
                           ),
-                          SizedBox(width: 8),
                         ],
-                        Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final dn = '${dayNumber ?? '?'}';
-                              final full = 'Today is a beautiful day $dn';
-                              final short = 'Today is day $dn';
-                              final style = kWelcomeBody;
-                              final textDirection = Directionality.of(context);
+                      ),
+                    ] else if (dayNumber != null) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final dn = dayNumber.toString();
+                                final full = 'Today is a beautiful day $dn';
+                                final short = 'Today is day $dn';
+                                final style = kWelcomeBody;
+                                final textDirection = Directionality.of(
+                                  context,
+                                );
 
-                              final tp = TextPainter(
-                                text: TextSpan(text: full, style: style),
-                                maxLines: 1,
-                                textDirection: textDirection,
-                              )..layout(maxWidth: constraints.maxWidth);
+                                final tp = TextPainter(
+                                  text: TextSpan(text: full, style: style),
+                                  maxLines: 1,
+                                  textDirection: textDirection,
+                                )..layout(maxWidth: constraints.maxWidth);
 
-                              final fits =
-                                  !tp.didExceedMaxLines &&
-                                  tp.width <= constraints.maxWidth;
-                              final display = fits ? full : short;
+                                final fits =
+                                    !tp.didExceedMaxLines &&
+                                    tp.width <= constraints.maxWidth;
+                                final display = fits ? full : short;
 
-                              return Text(
-                                display,
-                                style: style,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              );
-                            },
+                                return Text(
+                                  display,
+                                  style: style,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                );
+                              },
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                     SizedBox(height: 6),
                     Text(formattedDate, style: kWelcomeDate),
                   ],
