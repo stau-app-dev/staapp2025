@@ -169,10 +169,14 @@ final ThemeData appThemeData = ThemeData(
 
 // Reuse createMaterialColor helper from styles.dart by importing that file.
 MaterialColor createMaterialColor(Color color) {
-  final int r = color.red;
-  final int g = color.green;
-  final int b = color.blue;
-  return MaterialColor(color.value, <int, Color>{
+  // Newer Flutter Color API deprecates .red/.green/.blue/.value.
+  // Convert using component accessors to 0-255 ints.
+  final int r = (color.r * 255.0).round() & 0xff;
+  final int g = (color.g * 255.0).round() & 0xff;
+  final int b = (color.b * 255.0).round() & 0xff;
+  final int argb = (0xff << 24) | (r << 16) | (g << 8) | b;
+
+  return MaterialColor(argb, <int, Color>{
     50: Color.fromRGBO(r, g, b, .1),
     100: Color.fromRGBO(r, g, b, .2),
     200: Color.fromRGBO(r, g, b, .3),

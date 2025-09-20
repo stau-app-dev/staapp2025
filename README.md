@@ -14,18 +14,19 @@ Key code areas:
 
 - `lib/main.dart` – App entry and routing
 - `lib/common/` – Shared UI tokens and theme
-	- `styles.dart` – Barrel exporting tokens
-	- `theme.dart` – Barrel exporting `ThemeData`
+	- `styles.dart` – Source-of-truth tokens (colors, radii, text styles)
+	- `theme.dart` – Source-of-truth `ThemeData`
 - `lib/core/` – App bootstrap and platform glue
 	- `firebase_bootstrap.dart` – Cross-platform Firebase init
 - `lib/features/` – Feature-first modules
 	- `home/` → Home page + blocks (`ui/`), data (`data/`)
-	- `song_requests/` → `SongRequestsPage` (`ui/`)
+	- `song_requests/` → `SongRequestsPage` (`ui/`), data service (`data/`)
 	- `profile/` → `ProfilePage` (`ui/`)
 	- `auth/` → `AuthService`, `ensureSignedIn` (`guard.dart`), `LoginPage` (`ui/`)
 - `lib/widgets/` – Reusable widgets (e.g., error cards, homeblocks)
 - `lib/services/` – HTTP/data access (to be folded under features/*/data later)
-- `lib/consts.dart` – Profanity list and helpers (client-side UX only)
+- `lib/features/song_requests/data/profanity.dart` – Profanity list and helpers (client-side UX only)
+	(Note: `lib/consts.dart` remains as a forward export for backward compatibility.)
 
 ## Screenshots
 

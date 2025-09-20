@@ -105,10 +105,17 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
 
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthService>(context);
-    final userEmail = auth.email ?? '';
+    // Be resilient if no AuthService provider is present (e.g., in tests)
+    AuthService? auth;
+    try {
+      auth = Provider.of<AuthService>(context, listen: false);
+    } catch (_) {
+      auth = null;
+    }
+    final userEmail = auth?.email ?? '';
     final canAdd =
-        auth.isSignedIn && userEmail.toLowerCase().endsWith('ycdsb.ca');
+        (auth?.isSignedIn ?? false) &&
+        userEmail.toLowerCase().endsWith('ycdsb.ca');
 
     return Container(
       decoration: kCardDecoration,

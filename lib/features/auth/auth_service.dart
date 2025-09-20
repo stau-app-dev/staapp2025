@@ -3,7 +3,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart' as fcore;
 import 'package:firebase_auth/firebase_auth.dart' as fb;
-import 'package:staapp2025/services/home_service.dart';
+// Replace legacy services import with the new auth data service
+import 'package:staapp2025/features/auth/data/user_service.dart';
 
 class AuthService extends ChangeNotifier {
   // Ensure Firebase is initialized before using any Firebase services.
