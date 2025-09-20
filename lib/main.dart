@@ -1,42 +1,32 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb;
-// imports for block implementations moved to lib/homeblocks/
-import 'styles.dart';
-import 'theme.dart';
-import 'home.dart';
+import 'core/firebase_bootstrap.dart';
+// You can still import shared styles/theme directly, or via common/ barrels.
+import 'common/styles.dart';
+import 'common/theme.dart';
+// Feature barrels (new structure) that re-export existing pages/widgets.
+import 'package:staapp2025/features/home/home.dart';
 import 'package:staapp2025/widgets/homeblocks/homeblocks.dart';
-import 'songrequests.dart';
-import 'profile.dart';
+import 'package:staapp2025/features/song_requests/song_requests.dart';
+import 'package:staapp2025/features/profile/profile.dart';
 import 'package:provider/provider.dart';
-import 'auth.dart';
-import 'login_page.dart';
+import 'package:staapp2025/features/auth/auth_service.dart';
+import 'package:staapp2025/features/auth/guard.dart';
+
+// no async zone hacks to avoid zone mismatch errors
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kIsWeb) {
-    // Initialize Firebase for web using provided config
-    const options = FirebaseOptions(
-      apiKey: 'AIzaSyD6g_zu-fCz86WRbsqkJlmVlhK5nxB9UVM',
-      authDomain: 'staugustinechsapp.firebaseapp.com',
-      databaseURL: 'https://staugustinechsapp.firebaseio.com',
-      projectId: 'staugustinechsapp',
-      storageBucket: 'staugustinechsapp.appspot.com',
-      messagingSenderId: '448336593725',
-      appId: '1:448336593725:web:689321db00ef6fbb24fb54',
-      measurementId: 'G-60YM5QL4QX',
-    );
-    try {
-      await Firebase.initializeApp(options: options);
-    } catch (_) {
-      // ignore double-init during hot reload
-    }
-    // Ensure sessions persist across browser restarts (LOCAL) for web.
-    try {
-      await fb.FirebaseAuth.instance.setPersistence(fb.Persistence.LOCAL);
-    } catch (_) {}
-  }
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    // Also print to console for visibility.
+    // In debug we keep failing, in release we'd report.
+    // ignore: avoid_print
+    print('FlutterError: \\n${details.exceptionAsString()}\\n${details.stack}');
+  };
+  await bootstrapFirebase();
+  assert(Firebase.apps.isNotEmpty, 'Firebase failed to initialize');
+  // Firebase initialized
   runApp(const StaApp());
 }
 
@@ -100,11 +90,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final auth = Provider.of<AuthService>(context, listen: false);
     if (!auth.isSignedIn) {
-      await Navigator.of(
-        context,
-      ).push(MaterialPageRoute(builder: (_) => const LoginPage()));
-      if (!mounted) return;
-      if (!auth.isSignedIn) return;
+      // Use guard helper to handle login flow
+      final ok = await ensureSignedIn(context);
+      if (!mounted || !ok) return;
     }
 
     setState(() {

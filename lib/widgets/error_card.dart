@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:staapp2025/styles.dart';
+import 'package:staapp2025/common/styles.dart';
 
 /// Small reusable error card used across blocks to show an error message and an optional retry button.
 class ErrorCard extends StatelessWidget {

@@ -13,11 +13,18 @@ A Flutter app for the STA community built for the 2025-2026 school year. It prov
 Key code areas:
 
 - `lib/main.dart` – App entry and routing
-- `lib/styles.dart` and `lib/theme.dart` – Design tokens and `ThemeData`
-- `lib/auth.dart` – Google Sign-In and domain restrictions
-- `lib/widgets/homeblocks/announcements_block.dart` – Announcements UI
-- `lib/songrequests.dart` – Song Requests UI and validators
-- `lib/profile.dart` – Profile UI and logout
+- `lib/common/` – Shared UI tokens and theme
+	- `styles.dart` – Barrel exporting tokens
+	- `theme.dart` – Barrel exporting `ThemeData`
+- `lib/core/` – App bootstrap and platform glue
+	- `firebase_bootstrap.dart` – Cross-platform Firebase init
+- `lib/features/` – Feature-first modules
+	- `home/` → Home page + blocks (`ui/`), data (`data/`)
+	- `song_requests/` → `SongRequestsPage` (`ui/`)
+	- `profile/` → `ProfilePage` (`ui/`)
+	- `auth/` → `AuthService`, `ensureSignedIn` (`guard.dart`), `LoginPage` (`ui/`)
+- `lib/widgets/` – Reusable widgets (e.g., error cards, homeblocks)
+- `lib/services/` – HTTP/data access (to be folded under features/*/data later)
 - `lib/consts.dart` – Profanity list and helpers (client-side UX only)
 
 ## Screenshots
@@ -51,7 +58,7 @@ Key code areas:
 
 3) Domain restriction
 
-The app only allows sign-in with `ycdsb.ca` and `ycdsbk12.ca` emails. This is enforced in `lib/auth.dart` across interactive and silent sign-in flows.
+The app only allows sign-in with `ycdsb.ca` and `ycdsbk12.ca` emails. This is enforced in `lib/features/auth/auth_service.dart` across interactive and silent sign-in flows.
 
 ## Run
 
@@ -107,6 +114,7 @@ Sensitive files are ignored by `.gitignore` (e.g., `google-services.json`, `Goog
 
 - If sign-in is blocked, verify you’re using a `ycdsb.ca` or `ycdsbk12.ca` account and that platform OAuth is correctly configured.
 - On iOS, ensure URL Schemes match your reversed client ID for Google Sign-In.
+- If you see "No such module 'Flutter'" in iOS Swift files, clean iOS builds: `flutter clean`, remove `ios/Pods` and `ios/Runner.xcworkspace`, run `flutter pub get` then `cd ios && pod install && cd ..`, and try `flutter run` again.
 - If builds fail, verify platform toolchains and run `flutter doctor`.
 
 ## License
