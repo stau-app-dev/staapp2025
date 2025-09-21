@@ -8,22 +8,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:staapp2025/features/home/ui/homeblocks.dart';
+import 'package:staapp2025/main.dart';
 
 void main() {
-  testWidgets('App builds', (WidgetTester tester) async {
-    // Build only the AnnouncementsBlock inside a MaterialApp to keep the test
-    // focused and avoid unrelated layout/network issues.
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SingleChildScrollView(child: AnnouncementsBlock()),
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('Announcements Board'), findsOneWidget);
-    // The fallback announcement should be present when network fails.
-    expect(find.text('Titans'), findsOneWidget);
+  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(const MyApp());
+
+    // Verify that our counter starts at 0.
+    expect(find.text('0'), findsOneWidget);
+    expect(find.text('1'), findsNothing);
+
+    // Tap the '+' icon and trigger a frame.
+    await tester.tap(find.byIcon(Icons.add));
+    await tester.pump();
+
+    // Verify that our counter has incremented.
+    expect(find.text('0'), findsNothing);
+    expect(find.text('1'), findsOneWidget);
   });
 }

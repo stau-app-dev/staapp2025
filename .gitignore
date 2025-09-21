@@ -43,35 +43,3 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-
-# Firebase / Google service config
-google-services.json
-**/google-services.json
-GoogleService-Info.plist
-**/GoogleService-Info.plist
-
-# Environment / secret files
-.env
-.env.*
-secrets.json
-secrets.yaml
-
-# Keystore / signing keys
-*.jks
-*.keystore
-key.properties
-
-# macOS
-.DS_Store
-
-# iOS/macOS signing assets
-*.p12
-*.cer
-*.mobileprovision
-*.provisionprofile
-
-# Private keys / certificates
-*.pem
-*.key
-id_rsa
-id_ed25519

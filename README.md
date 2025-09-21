@@ -92,6 +92,36 @@ Select a different device with `flutter devices` and then `flutter run -d <devic
 
 	Output in `build/web`.
 
+### Deploying Web build on Netfirms (Apache)
+
+This repo includes `web/.htaccess` tailored for typical Netfirms shared hosting (Apache):
+
+- Routes deep links to `index.html` (single-page app)
+- Sets conservative caching for `index.html`, `flutter_service_worker.js`, and manifests so a normal reload picks up new builds
+- Long-caches static hashed assets (images, fonts, CSS)
+- Adds MIME types for `.wasm`, `.webmanifest`, `.mjs`
+
+Steps:
+
+1) Build with your desired base path. For example, if the app is hosted under `/staapp2025/` subfolder:
+
+	flutter clean  # optional
+	flutter build web --release --base-href /staapp2025/
+
+2) Upload the contents of `build/web` to your Netfirms hosting at the target folder (e.g., `/public_html/staapp2025/`). Ensure `.htaccess` is uploaded too. If your control panel hides dotfiles, enable “show hidden files”.
+
+3) Verify headers in the browser DevTools (Network tab):
+
+- index.html → Cache-Control: no-cache, no-store, must-revalidate
+- flutter_service_worker.js → Cache-Control: no-cache, no-store, must-revalidate
+- AssetManifest.json / FontManifest.json / NOTICES → no-cache
+- main.dart.js / flutter.js → max-age ~3600 (or as configured)
+- Images/fonts/CSS → public, max-age=31536000, immutable
+
+4) Test routing: navigate directly to a deep link like `/staapp2025/#/song-requests` (or your actual route). It should load without 404s.
+
+5) Update flow: On new deploys, a standard browser reload should pick up the new `index.html` and service worker, which will then refresh cached assets. Users may still see an “Update available” on the next load; an additional hard refresh is typically not required with these headers.
+
 - macOS:
 
 	flutter build macos --release
@@ -131,6 +161,12 @@ Sensitive files are ignored by `.gitignore` (e.g., `google-services.json`, `Goog
 - On iOS, ensure URL Schemes match your reversed client ID for Google Sign-In.
 - If you see "No such module 'Flutter'" in iOS Swift files, clean iOS builds: `flutter clean`, remove `ios/Pods` and `ios/Runner.xcworkspace`, run `flutter pub get` then `cd ios && pod install && cd ..`, and try `flutter run` again.
 - If builds fail, verify platform toolchains and run `flutter doctor`.
+
+### Web hosting tips (Apache/Netfirms)
+
+- If routes 404, confirm `Options -MultiViews` is present in `web/.htaccess` and that `mod_rewrite` is enabled on the host.
+- If updates don’t show on reload, confirm cache headers above. Some CDNs or control panels may override headers—disable “Aggressive caching” or similar.
+- If `.htaccess` isn’t applied, check that overrides are allowed in that directory (AllowOverride All). On shared hosting this is usually enabled by default for public_html.
 
 ## License
 

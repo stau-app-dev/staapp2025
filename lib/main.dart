@@ -1,38 +1,9 @@
 import 'package:flutter/material.dart';
-import 'core/firebase_bootstrap.dart';
-// You can still import shared styles/theme directly, or via common/ barrels.
-import 'common/styles.dart';
-import 'common/theme.dart';
-// Feature UI imports (direct, after removing forwarder files)
-import 'package:staapp2025/features/home/ui/home.dart';
-import 'package:staapp2025/features/home/ui/homeblocks.dart';
-import 'package:staapp2025/features/song_requests/ui/song_requests_page.dart';
-import 'package:staapp2025/features/profile/ui/profile_page.dart';
-import 'package:provider/provider.dart';
-import 'package:staapp2025/features/auth/auth_service.dart';
-import 'package:staapp2025/features/auth/guard.dart';
-import 'package:staapp2025/common/pwa.dart' as pwa;
+import 'package:intl/intl.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
-// no async zone hacks to avoid zone mismatch errors
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-    // Also print to console for visibility.
-    // In debug we keep failing, in release we'd report.
-    // ignore: avoid_print
-    print('FlutterError: \\n${details.exceptionAsString()}\\n${details.stack}');
-  };
-  try {
-    await bootstrapFirebase();
-  } catch (e, st) {
-    // ignore: avoid_print
-    print('bootstrapFirebase failed: $e');
-    // ignore: avoid_print
-    print(st);
-  }
-  // Firebase initialized
+void main() {
   runApp(const StaApp());
 }
 
@@ -41,18 +12,19 @@ class StaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) {
-        final s = AuthService();
-        s.init();
-        return s;
-      },
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'St. Augustine CHS',
-        theme: appThemeData.copyWith(scaffoldBackgroundColor: kBackground),
-        home: const HomeScreen(),
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'St. Augustine CHS',
+      theme: ThemeData(
+        fontFamily: 'Roboto',
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Color(0xFF8B1534),
+        ), // sampled maroon
+        scaffoldBackgroundColor: Color(
+          0xFFF6F6F6,
+        ), // slightly lighter background
       ),
+      home: const HomeScreen(),
     );
   }
 }
@@ -66,113 +38,569 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  final GlobalKey<AnnouncementsBlockState> _announcementsKey =
-      GlobalKey<AnnouncementsBlockState>();
-
-  @override
-  void initState() {
-    super.initState();
-    // After the first frame, ensure the AuthService attempts to refresh the
-    // remote profile. This ensures songRequestCount/songUpvoteCount are
-    // loaded early when the app starts.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = Provider.of<AuthService>(context, listen: false);
-      // Fire-and-forget; refreshRemoteUser is safe when not signed in.
-      auth.refreshRemoteUser(caller: 'home.init');
-    });
-  }
 
   void _onItemTapped(int index) {
-    _handleNavigation(index);
-  }
-
-  Future<void> _handleNavigation(int index) async {
-    if (index == 0) {
-      setState(() {
-        _selectedIndex = index;
-      });
-      return;
-    }
-
-    final auth = Provider.of<AuthService>(context, listen: false);
-    if (!auth.isSignedIn) {
-      // Use guard helper to handle login flow
-      final ok = await ensureSignedIn(context);
-      if (!mounted || !ok) return;
-    }
-
     setState(() {
       _selectedIndex = index;
     });
-
-    // If the user navigated to the Song Requests page, refresh the remote
-    // profile so the counters displayed there are up-to-date.
-    // Redundant with songs.init (page-owned refresh), so skip here
-    // if (index == 1) {
-    //   final auth = Provider.of<AuthService>(context, listen: false);
-    //   auth.refreshRemoteUser(caller: 'home.navToSongs');
-    // }
   }
 
   @override
   Widget build(BuildContext context) {
-    final extraBottom = pwa.extraNavBarBottomPadding();
     return Scaffold(
       body: SafeArea(
-        child: Builder(
-          builder: (context) {
-            final pages = <Widget>[
-              // HomePage now lives in lib/home.dart and accepts the key so
-              // the parent can trigger a refresh on the AnnouncementsBlock.
-              HomePage(announcementsKey: _announcementsKey),
-              const SongRequestsPage(),
-              const ProfilePage(),
-            ];
-
-            final current = pages[_selectedIndex];
-
-            // Wrap only the HomePage with RefreshIndicator so pull-to-refresh
-            // works and delegates to the announcements key.
-            if (_selectedIndex == 0) {
-              return RefreshIndicator(
-                onRefresh: () async {
-                  final state = _announcementsKey.currentState;
-                  if (state != null) {
-                    await (state as dynamic).refreshAnnouncements();
-                  }
-                },
-                child: current,
-              );
-            }
-
-            return current;
-          },
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                WelcomeBlock(),
+                SizedBox(height: 16),
+                AnnouncementsBlock(),
+                SizedBox(height: 16),
+                CafeteriaBlock(),
+                SizedBox(height: 16),
+                SpiritMeterBlock(),
+                SizedBox(height: 16),
+                ChaplaincyBlock(),
+              ],
+            ),
+          ),
         ),
       ),
-      bottomNavigationBar: Container(
-        color: kMaroon,
-        padding: EdgeInsets.only(bottom: extraBottom),
-        child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: kMaroon, // sampled maroon
-          elevation: extraBottom > 0 ? 0 : 8,
-          selectedItemColor: kGold, // sampled gold
-          unselectedItemColor: kWhite,
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.music_note),
-              label: 'Song Requests',
-            ),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          ],
-        ),
+      bottomNavigationBar: BottomNavigationBar(
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Color(0xFF8B1534), // sampled maroon
+        selectedItemColor: Color(0xFFFFD600), // sampled gold
+        unselectedItemColor: Colors.white,
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.restaurant_menu),
+            label: 'Cafeteria',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.music_note),
+            label: 'Song Requests',
+          ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
       ),
     );
   }
 }
 
-// Block widgets (WelcomeBlock, AnnouncementsBlock, SpiritMeterBlock,
-// ChaplaincyBlock) were moved to lib/widgets/homeblocks/ to remove duplication.
+class WelcomeBlock extends StatefulWidget {
+  const WelcomeBlock({super.key});
+
+  @override
+  State<WelcomeBlock> createState() => _WelcomeBlockState();
+}
+
+class _WelcomeBlockState extends State<WelcomeBlock> {
+  int? dayNumber;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDayNumber();
+  }
+
+  Future<void> _fetchDayNumber() async {
+    const url =
+        'https://us-central1-staugustinechsapp.cloudfunctions.net/getDayNumber';
+    try {
+      final resp = await http.get(Uri.parse(url)).timeout(Duration(seconds: 6));
+      if (resp.statusCode == 200) {
+        final body = json.decode(resp.body);
+        final dn = body['data']?['dayNumber'];
+        if (dn is int) {
+          setState(() {
+            dayNumber = dn;
+            loading = false;
+          });
+          return;
+        }
+      }
+    } catch (e) {
+      // ignore, fallback below
+    }
+    // fallback: leave null and stop loading
+    setState(() {
+      loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final today = DateTime.now();
+    final formattedDate = DateFormat('MMMM d, yyyy').format(today);
+    return Container(
+      decoration: BoxDecoration(
+        color: Color(0xFF8B1534), // sampled maroon
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Color(0xFFE6B800),
+          width: 2,
+        ), // deeper gold, thinner border
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.10),
+            blurRadius: 12,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome to St. Augustine',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Row(
+                  children: [
+                    if (loading) ...[
+                      SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Text(
+                        'Today is a beautiful day ${dayNumber ?? '?'}',
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 6),
+                Text(
+                  formattedDate,
+                  style: TextStyle(color: Colors.white, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 12),
+          Padding(
+            padding: const EdgeInsets.all(4.0),
+            child: Image.asset(
+              'assets/logos/sta_logo.png',
+              width: 76,
+              height: 76,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) =>
+                  Icon(Icons.school, size: 48, color: Color(0xFF971B36)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AnnouncementsBlock extends StatelessWidget {
+  final List<Map<String, String>> announcements = const [
+    {
+      'title': 'Varsity Girls Basketball',
+      'body':
+          'All girls in gr. 9-12 interested in trying out for girls basketball team are asked to check the poster outside of room 216 at the top of the foyer stairs for more information',
+    },
+    {
+      'title': 'Senior Boys Soccer',
+      'body':
+          'Tryouts for the Senior Boys Soccer team will begin on Fri Sept 4th. Join the Google Classroom using the code (6fzaopqa) found on the poster in front of Room 221. Permission Form required.',
+    },
+    {
+      'title': 'St. Augustine Concert Band',
+      'body':
+          'Interested in joining the St. Augustine Concert Band? There will be a meeting for information about auditions this Thursday, September 4, after school in room 115. See you there!',
+    },
+    {
+      'title': 'Girls Golf Team',
+      'body':
+          'All girls interested in joining the Girls Golf Team, see the Phys Ed office for more information.',
+    },
+    {
+      'title': 'STA',
+      'body':
+          'Want these morning announcements on your devices? Want to know if it is day 1 or 2? Goto staugustinechs.ca now!',
+    },
+  ];
+
+  const AnnouncementsBlock({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Announcements Board',
+            style: TextStyle(
+              color: Color(0xFF971B36),
+              fontWeight: FontWeight.bold,
+              fontSize: 22,
+            ),
+          ),
+          SizedBox(height: 12),
+          ...announcements.map(
+            (a) => Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Color(0xFF8B1534), width: 1),
+                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      padding: EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            a['title']!,
+                            style: TextStyle(
+                              color: Color(0xFF971B36),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            a['body']!,
+                            style: TextStyle(
+                              color: Color(0xFF971B36),
+                              fontSize: 15,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CafeteriaBlock extends StatelessWidget {
+  final List<Map<String, String>> specials = const [
+    {'name': 'Burger with Fries', 'image': ''},
+    {'name': 'Chicken Burger', 'image': ''},
+    {
+      'name': 'Fries',
+      'image':
+          'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=400&q=80',
+    },
+  ];
+
+  const CafeteriaBlock({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Featured Cafe Items',
+                style: TextStyle(
+                  color: Color(0xFF971B36),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+              Text(
+                'View More >',
+                style: TextStyle(
+                  color: Color(0xFFFFD600),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12),
+          SizedBox(
+            height: 120,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: specials.length,
+              separatorBuilder: (context, index) => SizedBox(width: 12),
+              itemBuilder: (context, index) {
+                final item = specials[index];
+                return Container(
+                  width: 110,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Color(0xFF8B1534), width: 2),
+                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: item['image']!.isEmpty
+                            ? Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.image,
+                                    size: 40,
+                                    color: Colors.grey,
+                                  ),
+                                  Text(
+                                    'Image Unavailable',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : ClipRRect(
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(14),
+                                ),
+                                child: Image.network(
+                                  item['image']!,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: 70,
+                                ),
+                              ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          item['name']!,
+                          style: TextStyle(
+                            color: Color(0xFF971B36),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class SpiritMeterBlock extends StatelessWidget {
+  final Map<String, double> spiritLevels = const {
+    '9': 0.7,
+    '10': 0.5,
+    '11': 0.4,
+    '12': 0.9,
+  };
+
+  const SpiritMeterBlock({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Spirit Meter',
+            style: TextStyle(
+              color: Color(0xFF8B1534),
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
+          ),
+          SizedBox(height: 12),
+          ...spiritLevels.entries.map(
+            (entry) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 28,
+                    child: Text(
+                      entry.key,
+                      style: TextStyle(
+                        color: Color(0xFF8B1534),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: LinearProgressIndicator(
+                      value: entry.value,
+                      minHeight: 10,
+                      backgroundColor: Color(0xFFFFF9C4),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFFFFD600),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ChaplaincyBlock extends StatelessWidget {
+  const ChaplaincyBlock({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Chaplaincy Corner',
+            style: TextStyle(
+              color: Color(0xFF971B36),
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+            ),
+          ),
+          SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Color(0xFF8B1534), width: 1),
+              borderRadius: BorderRadius.circular(16),
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 6,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Verse of The Day',
+                  style: TextStyle(
+                    color: Color(0xFF8B1534),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'What you heard from me, keep as the pattern of sound teaching, with faith and love in Christ Jesus. Guard the good deposit that was entrusted to you—guard it with the help of the Holy Spirit who lives in us.',
+                  style: TextStyle(color: Color(0xFF8B1534), fontSize: 15),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
