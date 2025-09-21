@@ -1,0 +1,99 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Analyze and test Flutter project",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run Flutter tests",
+			"type": "shell",
+			"command": "flutter test",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test after auth name fallback",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test after displayName change",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test after UID standardization",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test after PWA padding",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test after fixing web util",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test after lints ignore",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Final analyze and test for PWA nav padding",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Rebuild web for subdir PWA",
+			"type": "shell",
+			"command": "flutter build web --release --base-href /staapp2025/",
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}

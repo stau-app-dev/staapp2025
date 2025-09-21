@@ -42,6 +42,13 @@ class AuthService extends ChangeNotifier {
   // Public getters for UI code
   String? get email => _currentEmail;
   String? get displayName {
+    // 1) Prefer backend remote user name if available
+    final remoteName = _remoteUser?['name'];
+    if (remoteName is String && remoteName.trim().isNotEmpty) {
+      return remoteName;
+    }
+
+    // 2) Fall back to FirebaseAuth/display name
     final u = _fbUser;
     if (u == null) return null;
     final dn = u.displayName;
@@ -51,6 +58,19 @@ class AuthService extends ChangeNotifier {
           p.displayName != null &&
           p.displayName!.trim().isNotEmpty) {
         return p.displayName;
+      }
+    }
+
+    // 3) Derive from email local part as a last resort
+    final em = u.email ?? '';
+    if (em.contains('@')) {
+      final local = em.split('@').first;
+      if (local.isNotEmpty) {
+        return local
+            .split('.')
+            .where((s) => s.trim().isNotEmpty)
+            .map((s) => s[0].toUpperCase() + s.substring(1))
+            .join(' ');
       }
     }
     return null;
@@ -77,21 +97,13 @@ class AuthService extends ChangeNotifier {
   /// UID (matches legacy google_sign_in id) and fall back to Firebase UID.
   /// On mobile, use GoogleSignInAccount.id.
   String? get backendUserId {
-    return _webGoogleProviderUid ?? _fbUser?.uid;
+    // Standardize on FirebaseAuth UID across all platforms to avoid
+    // duplicate user documents with different IDs.
+    return _fbUser?.uid;
   }
 
-  // Helper: Google provider UID for web (matches legacy GoogleSignIn id)
-  String? get _webGoogleProviderUid {
-    final u = _fbUser;
-    if (u == null) return null;
-    for (final p in u.providerData) {
-      final puid = p.uid;
-      if (p.providerId == 'google.com' && puid != null && puid.isNotEmpty) {
-        return puid;
-      }
-    }
-    return null;
-  }
+  // Note: We previously used the Google provider UID on web to match legacy
+  // ids, but we now standardize on FirebaseAuth UID to avoid duplicates.
 
   Map<String, dynamic>? _remoteUser;
   Map<String, dynamic>? get remoteUser => _remoteUser;
@@ -177,8 +189,8 @@ class AuthService extends ChangeNotifier {
           return;
         }
         try {
-          final providerUid = _webGoogleProviderUid;
-          final backendId = providerUid ?? u.uid;
+          // Always use FirebaseAuth UID for backend doc id
+          final backendId = u.uid;
           String name = u.displayName ?? '';
           if (name.trim().isEmpty) {
             for (final p in u.providerData) {
@@ -187,6 +199,20 @@ class AuthService extends ChangeNotifier {
                   p.displayName!.trim().isNotEmpty) {
                 name = p.displayName!;
                 break;
+              }
+            }
+          }
+          // Fallback: derive a readable name from email if none provided
+          if (name.trim().isEmpty) {
+            final em = email ?? u.email ?? '';
+            if (em.contains('@')) {
+              final local = em.split('@').first;
+              if (local.isNotEmpty) {
+                name = local
+                    .split('.')
+                    .where((s) => s.trim().isNotEmpty)
+                    .map((s) => s[0].toUpperCase() + s.substring(1))
+                    .join(' ');
               }
             }
           }
@@ -302,8 +328,8 @@ class AuthService extends ChangeNotifier {
     final u = _fbUser;
     if (u == null) return;
     try {
-      final providerUid = _webGoogleProviderUid;
-      final backendId = providerUid ?? u.uid;
+      // Always use FirebaseAuth UID for backend doc id
+      final backendId = u.uid;
       String name = u.displayName ?? '';
       if (name.trim().isEmpty) {
         for (final p in u.providerData) {
@@ -312,6 +338,20 @@ class AuthService extends ChangeNotifier {
               p.displayName!.trim().isNotEmpty) {
             name = p.displayName!;
             break;
+          }
+        }
+      }
+      // Fallback: derive a readable name from email if none provided
+      if (name.trim().isEmpty) {
+        final em = u.email ?? '';
+        if (em.contains('@')) {
+          final local = em.split('@').first;
+          if (local.isNotEmpty) {
+            name = local
+                .split('.')
+                .where((s) => s.trim().isNotEmpty)
+                .map((s) => s[0].toUpperCase() + s.substring(1))
+                .join(' ');
           }
         }
       }

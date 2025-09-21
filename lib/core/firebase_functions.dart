@@ -232,8 +232,11 @@ Future<Map<String, dynamic>> getUser({
   http.Client? client,
 }) async {
   client ??= http.Client();
-  final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getUser?id=$id&email=$email&name=$name',
+  // Build URL with proper encoding for all query parameters.
+  final url = Uri.https(
+    'us-central1-staugustinechsapp.cloudfunctions.net',
+    '/getUser',
+    {'id': id, 'email': email, 'name': name},
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 6));
   if (resp.statusCode != 200) {
