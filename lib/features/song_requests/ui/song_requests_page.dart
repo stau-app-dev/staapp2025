@@ -89,6 +89,11 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
 
     final songRequestCount = auth.songRequestCount;
     final songUpvoteCount = auth.songUpvoteCount;
+    // Disable add button only when signed in AND explicitly at 0 remaining.
+    // If not signed in or value is not yet loaded (null), keep enabled to prompt sign-in/refresh.
+    final canAddNow =
+        !(auth.isSignedIn &&
+            (songRequestCount != null && songRequestCount <= 0));
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(kPage, kPage, kPage, 0),
@@ -111,32 +116,40 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
           // Add Song button opens a modal dialog
           Center(
             child: ElevatedButton.icon(
-              onPressed: () async {
-                // Capture messenger before any awaits to avoid using context after async gaps.
-                final messenger = ScaffoldMessenger.of(context);
-                // Ensure the user is signed in; if not, show login.
-                final ok = await ensureSignedIn(context);
-                if (!context.mounted) return;
-                if (!ok) return;
-                final auth = Provider.of<AuthService>(context, listen: false);
-                // Refresh remote user to ensure we have up-to-date counters.
-                try {
-                  await auth.refreshRemoteUser(
-                    caller: 'songs.addButtonPrefetch',
-                  );
-                } catch (_) {}
-                final remaining = auth.songRequestCount ?? 0;
-                if (remaining <= 0) {
-                  messenger.showSnackBar(
-                    SnackBar(
-                      content: Text('No song requests left', style: kBodyText),
-                    ),
-                  );
-                  return;
-                }
-                if (!context.mounted) return;
-                _showAddSongDialog(context);
-              },
+              onPressed: canAddNow
+                  ? () async {
+                      // Capture messenger before any awaits to avoid using context after async gaps.
+                      final messenger = ScaffoldMessenger.of(context);
+                      // Ensure the user is signed in; if not, show login.
+                      final ok = await ensureSignedIn(context);
+                      if (!context.mounted) return;
+                      if (!ok) return;
+                      final auth = Provider.of<AuthService>(
+                        context,
+                        listen: false,
+                      );
+                      // Refresh remote user to ensure we have up-to-date counters.
+                      try {
+                        await auth.refreshRemoteUser(
+                          caller: 'songs.addButtonPrefetch',
+                        );
+                      } catch (_) {}
+                      final remaining = auth.songRequestCount ?? 0;
+                      if (remaining <= 0) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'No song requests left',
+                              style: kBodyText,
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      if (!context.mounted) return;
+                      _showAddSongDialog(context);
+                    }
+                  : null,
               icon: const Icon(Icons.add),
               label: Text('Add Song'),
               style: ElevatedButton.styleFrom(
@@ -472,10 +485,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      'Delete Song',
-                      style: kWelcomeTitle.copyWith(color: kMaroon),
-                    ),
+                    Text('Delete Song', style: kSectionTitleSmall),
                     const SizedBox(height: 18),
                     Expanded(
                       child: SingleChildScrollView(
@@ -662,10 +672,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                         ),
                         padding: kButtonPadding,
                       ),
-                      child: Text(
-                        'Delete',
-                        style: kWelcomeTitle.copyWith(color: kMaroon),
-                      ),
+                      child: Text('Delete', style: kSectionTitleSmall),
                     ),
                   ],
                 ),
@@ -702,7 +709,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
             side: BorderSide(color: kMaroon, width: 1.4),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(mainInsidePadding),
@@ -721,10 +728,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      'Add Song',
-                      style: kWelcomeTitle.copyWith(color: kMaroon),
-                    ),
+                    Text('Add Song', style: kSectionTitleSmall),
                     const SizedBox(height: 18),
                     Expanded(
                       child: SingleChildScrollView(
@@ -749,7 +753,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   hintText: 'Never Gonna Give You Up',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(
-                                      kBlockRadius,
+                                      kInnerRadius,
                                     ),
                                     borderSide: BorderSide(color: kMaroon),
                                   ),
@@ -781,7 +785,9 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                 decoration: InputDecoration(
                                   hintText: 'Rick Astley',
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(28),
+                                    borderRadius: BorderRadius.circular(
+                                      kInnerRadius,
+                                    ),
                                     borderSide: BorderSide(color: kMaroon),
                                   ),
                                 ),
@@ -962,7 +968,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                 ),
                                 child: Text(
                                   'Submit',
-                                  style: kWelcomeTitle.copyWith(color: kMaroon),
+                                  style: kSectionTitleSmall,
                                 ),
                               ),
                               const SizedBox(height: 18),
