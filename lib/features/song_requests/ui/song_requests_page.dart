@@ -253,139 +253,155 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                       final canDelete = auth.isAdmin;
                       final id = (s['id'] ?? '').toString();
 
+                      // Disable upvote if signed in and no upvotes left; keep enabled when not signed in
+                      final canUpvoteNow =
+                          !(auth.isSignedIn &&
+                              (songUpvoteCount != null &&
+                                  songUpvoteCount <= 0));
+
                       final card = _SongCard(
                         title: name,
                         subtitle: 'By: $artist',
                         upvotes: upvotes,
-                        onUpvote: () async {
-                          // Capture messenger as early as possible
-                          final messenger = ScaffoldMessenger.of(context);
-                          final ok = await ensureSignedIn(context);
-                          if (!context.mounted) return;
-                          if (!ok) return;
-                          final auth = Provider.of<AuthService>(
-                            context,
-                            listen: false,
-                          );
-                          try {
-                            await auth.refreshRemoteUser(
-                              caller: 'songs.upvoteOptimistic',
-                            );
-                          } catch (_) {}
-                          if (id.isEmpty) {
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Missing song id',
-                                  style: kBodyText,
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          final userEmail = auth.email ?? '';
-                          if (userEmail.isEmpty) {
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Missing user email',
-                                  style: kBodyText,
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          if (!context.mounted) return;
-                          _showProgressOverlay(context);
-                          try {
-                            final remainingUpvotes = auth.songUpvoteCount ?? 0;
-                            if (remainingUpvotes <= 0) {
-                              _hideProgressOverlay();
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'No upvotes left',
-                                    style: kBodyText,
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
+                        onUpvote: canUpvoteNow
+                            ? () async {
+                                // Capture messenger as early as possible
+                                final messenger = ScaffoldMessenger.of(context);
+                                final ok = await ensureSignedIn(context);
+                                if (!context.mounted) return;
+                                if (!ok) return;
+                                final auth = Provider.of<AuthService>(
+                                  context,
+                                  listen: false,
+                                );
+                                try {
+                                  await auth.refreshRemoteUser(
+                                    caller: 'songs.upvoteOptimistic',
+                                  );
+                                } catch (_) {}
+                                if (id.isEmpty) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Missing song id',
+                                        style: kBodyText,
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                final userEmail = auth.email ?? '';
+                                if (userEmail.isEmpty) {
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Missing user email',
+                                        style: kBodyText,
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (!context.mounted) return;
+                                _showProgressOverlay(context);
+                                try {
+                                  final remainingUpvotes =
+                                      auth.songUpvoteCount ?? 0;
+                                  if (remainingUpvotes <= 0) {
+                                    _hideProgressOverlay();
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'No upvotes left',
+                                          style: kBodyText,
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
 
-                            await fns.upvoteSong(
-                              songId: id,
-                              userEmail: userEmail,
-                            );
-                            if (!context.mounted) return;
-                            setState(() {
-                              _songsFuture = fns.fetchSongs();
-                            });
-                            try {
-                              await auth.refreshRemoteUser(
-                                caller: 'songs.deleteOptimistic',
-                              );
-                            } catch (_) {}
-                            _hideProgressOverlay();
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text('Upvoted!', style: kBodyText),
-                                ),
-                              );
-                            });
-                          } catch (e, st) {
-                            debugPrint(
-                              '[SongRequests] upvoteSong error: ${e.toString()}',
-                            );
-                            try {
-                              if (!kIsWeb) {
-                                debugPrintStack(stackTrace: st);
-                              } else {
-                                debugPrint('[stack] $st');
+                                  await fns.upvoteSong(
+                                    songId: id,
+                                    userEmail: userEmail,
+                                  );
+                                  if (!context.mounted) return;
+                                  setState(() {
+                                    _songsFuture = fns.fetchSongs();
+                                  });
+                                  try {
+                                    await auth.refreshRemoteUser(
+                                      caller: 'songs.deleteOptimistic',
+                                    );
+                                  } catch (_) {}
+                                  _hideProgressOverlay();
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Upvoted!',
+                                          style: kBodyText,
+                                        ),
+                                      ),
+                                    );
+                                  });
+                                } catch (e, st) {
+                                  debugPrint(
+                                    '[SongRequests] upvoteSong error: ${e.toString()}',
+                                  );
+                                  try {
+                                    if (!kIsWeb) {
+                                      debugPrintStack(stackTrace: st);
+                                    } else {
+                                      debugPrint('[stack] $st');
+                                    }
+                                  } catch (_) {
+                                    debugPrint('[stack print failed]');
+                                  }
+                                  final msg = e.toString();
+                                  final isBrowserFetchError =
+                                      msg.contains('Failed to fetch') ||
+                                      msg.contains('TimeoutException') ||
+                                      msg.contains('NetworkError') ||
+                                      msg.contains('XMLHttpRequest error') ||
+                                      msg.contains('TypeError');
+                                  if (kIsWeb && isBrowserFetchError) {
+                                    _hideProgressOverlay();
+                                    if (mounted) {
+                                      setState(() {
+                                        _songsFuture = fns.fetchSongs();
+                                      });
+                                    }
+                                    try {
+                                      await auth.refreshRemoteUser();
+                                    } catch (_) {}
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Upvoted. Refreshing list…',
+                                          style: kBodyText,
+                                        ),
+                                      ),
+                                    );
+                                    return;
+                                  }
+                                  _hideProgressOverlay();
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to upvote: ${e.toString()}',
+                                          style: kBodyText,
+                                        ),
+                                      ),
+                                    );
+                                  });
+                                }
                               }
-                            } catch (_) {
-                              debugPrint('[stack print failed]');
-                            }
-                            final msg = e.toString();
-                            final isBrowserFetchError =
-                                msg.contains('Failed to fetch') ||
-                                msg.contains('TimeoutException') ||
-                                msg.contains('NetworkError') ||
-                                msg.contains('XMLHttpRequest error') ||
-                                msg.contains('TypeError');
-                            if (kIsWeb && isBrowserFetchError) {
-                              _hideProgressOverlay();
-                              if (mounted) {
-                                setState(() {
-                                  _songsFuture = fns.fetchSongs();
-                                });
-                              }
-                              try {
-                                await auth.refreshRemoteUser();
-                              } catch (_) {}
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Upvoted. Refreshing list…',
-                                    style: kBodyText,
-                                  ),
-                                ),
-                              );
-                              return;
-                            }
-                            _hideProgressOverlay();
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Failed to upvote: ${e.toString()}',
-                                    style: kBodyText,
-                                  ),
-                                ),
-                              );
-                            });
-                          }
-                        },
+                            : null,
                       );
 
                       if (!canDelete) return card;
@@ -421,14 +437,22 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
       context: context,
       builder: (ctx) {
         return Dialog(
-          insetPadding: EdgeInsets.zero,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           backgroundColor: kWhite,
           elevation: 8,
           shape: RoundedRectangleBorder(
             borderRadius: mainBorderRadius,
             side: BorderSide(color: kMaroon, width: 1.4),
           ),
-          child: SizedBox.expand(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: 560,
+              // Allow height to be comfortable but scroll when content exceeds.
+              maxHeight: 640,
+            ),
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(mainInsidePadding),
@@ -667,14 +691,18 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
       context: context,
       builder: (ctx) {
         return Dialog(
-          insetPadding: EdgeInsets.zero,
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: 24,
+          ),
           backgroundColor: kWhite,
           elevation: 8,
           shape: RoundedRectangleBorder(
             borderRadius: mainBorderRadius,
             side: BorderSide(color: kMaroon, width: 1.4),
           ),
-          child: SizedBox.expand(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(mainInsidePadding),
