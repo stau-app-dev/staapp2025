@@ -225,7 +225,9 @@ class AuthService extends ChangeNotifier {
           try {
             final rc = _remoteUser?['songRequestCount'];
             final uc = _remoteUser?['songUpvoteCount'];
-            debugPrint('[Auth] remoteUser fetched: requests=$rc, upvotes=$uc');
+            debugPrint(
+              '[Auth] remoteUser fetched(authListener): requests=$rc, upvotes=$uc',
+            );
           } catch (_) {}
         } catch (e) {
           debugPrint('[Auth] getUser (all) failed: $e');
@@ -324,7 +326,7 @@ class AuthService extends ChangeNotifier {
   /// Re-fetches the remote user record for the currently signed-in Google
   /// account and updates the cached `_remoteUser`. Safe to call when not
   /// signed-in (it will do nothing).
-  Future<void> refreshRemoteUser() async {
+  Future<void> refreshRemoteUser({String caller = ''}) async {
     final u = _fbUser;
     if (u == null) return;
     try {
@@ -364,7 +366,10 @@ class AuthService extends ChangeNotifier {
       try {
         final rc = _remoteUser?['songRequestCount'];
         final uc = _remoteUser?['songUpvoteCount'];
-        debugPrint('[Auth] remoteUser refreshed: requests=$rc, upvotes=$uc');
+        final label = (caller.isNotEmpty) ? ' ($caller)' : '';
+        debugPrint(
+          '[Auth] remoteUser refreshed$label: requests=$rc, upvotes=$uc',
+        );
       } catch (_) {}
       notifyListeners();
     } catch (e) {

@@ -58,7 +58,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = Provider.of<AuthService>(context, listen: false);
       // Fire-and-forget; refreshRemoteUser is safe when not signed in.
-      auth.refreshRemoteUser();
+      auth.refreshRemoteUser(caller: 'songs.init');
     });
   }
 
@@ -68,7 +68,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
     final auth = Provider.of<AuthService>(context, listen: false);
     try {
       // Refresh remote user first so UI counters update quickly
-      await auth.refreshRemoteUser();
+      await auth.refreshRemoteUser(caller: 'songs.pullToRefresh');
     } catch (_) {}
 
     // Reload songs from the server and wait for the result so the
@@ -121,7 +121,9 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                 final auth = Provider.of<AuthService>(context, listen: false);
                 // Refresh remote user to ensure we have up-to-date counters.
                 try {
-                  await auth.refreshRemoteUser();
+                  await auth.refreshRemoteUser(
+                    caller: 'songs.addButtonPrefetch',
+                  );
                 } catch (_) {}
                 final remaining = auth.songRequestCount ?? 0;
                 if (remaining <= 0) {
@@ -186,7 +188,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                     // awaiting (fixes use_build_context_synchronously).
                     final messenger = ScaffoldMessenger.of(context);
                     try {
-                      await auth.refreshRemoteUser();
+                      await auth.refreshRemoteUser(caller: 'songs.upvote');
                       messenger.showSnackBar(
                         SnackBar(
                           content: Text('Profile refreshed', style: kBodyText),
@@ -266,7 +268,9 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                             listen: false,
                           );
                           try {
-                            await auth.refreshRemoteUser();
+                            await auth.refreshRemoteUser(
+                              caller: 'songs.upvoteOptimistic',
+                            );
                           } catch (_) {}
                           if (id.isEmpty) {
                             messenger.showSnackBar(
@@ -317,7 +321,9 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                               _songsFuture = fns.fetchSongs();
                             });
                             try {
-                              await auth.refreshRemoteUser();
+                              await auth.refreshRemoteUser(
+                                caller: 'songs.deleteOptimistic',
+                              );
                             } catch (_) {}
                             _hideProgressOverlay();
                             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -403,6 +409,8 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
     BuildContext context,
     Map<String, dynamic> song,
   ) async {
+    // Guard against multiple rapid dismiss actions to avoid navigator races
+    var isClosing = false;
     final auth = Provider.of<AuthService>(context, listen: false);
     final isAdmin = auth.isAdmin;
     final name = (song['name'] ?? '').toString().trim();
@@ -431,15 +439,10 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                       alignment: Alignment.topRight,
                       child: GestureDetector(
                         onTap: () {
-                          final rootNav = Navigator.of(
-                            context,
-                            rootNavigator: true,
-                          );
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            try {
-                              rootNav.pop();
-                            } catch (_) {}
-                          });
+                          if (isClosing) return;
+                          isClosing = true;
+                          // Pop the dialog immediately using the builder context
+                          Navigator.of(ctx).pop();
                         },
                         child: Icon(Icons.close, color: kGold),
                       ),
@@ -504,11 +507,10 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                     ElevatedButton(
                       onPressed: () async {
                         if (!isAdmin) {
-                          final rootNav = Navigator.of(
-                            context,
-                            rootNavigator: true,
-                          );
-                          rootNav.pop();
+                          if (!isClosing) {
+                            isClosing = true;
+                            Navigator.of(ctx).pop();
+                          }
                           final messenger = ScaffoldMessenger.of(context);
                           messenger.showSnackBar(
                             SnackBar(
@@ -522,11 +524,10 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                         }
                         final id = (song['id'] ?? '').toString();
                         if (id.isEmpty) {
-                          final rootNav = Navigator.of(
-                            context,
-                            rootNavigator: true,
-                          );
-                          rootNav.pop();
+                          if (!isClosing) {
+                            isClosing = true;
+                            Navigator.of(ctx).pop();
+                          }
                           final messenger = ScaffoldMessenger.of(context);
                           messenger.showSnackBar(
                             SnackBar(
@@ -542,11 +543,6 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                         // Show global progress overlay (dismissed via _hideProgressOverlay)
                         _showProgressOverlay(context);
                         final messenger = ScaffoldMessenger.of(context);
-                        // Capture the root navigator now to avoid context lookups later
-                        final rootNav = Navigator.of(
-                          context,
-                          rootNavigator: true,
-                        );
 
                         try {
                           await fns.deleteSong(id: id);
@@ -555,13 +551,17 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                             _songsFuture = fns.fetchSongs();
                           });
                           try {
-                            await auth.refreshRemoteUser();
+                            await auth.refreshRemoteUser(
+                              caller: 'songs.delete',
+                            );
                           } catch (_) {}
                           _hideProgressOverlay();
+                          if (!isClosing) {
+                            if (!ctx.mounted) return;
+                            isClosing = true;
+                            Navigator.of(ctx).pop();
+                          }
                           WidgetsBinding.instance.addPostFrameCallback((_) {
-                            try {
-                              rootNav.pop();
-                            } catch (_) {}
                             messenger.showSnackBar(
                               SnackBar(
                                 content: Text('Song deleted', style: kBodyText),
@@ -593,18 +593,20 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                               msg.contains('TypeError');
                           if (kIsWeb && isBrowserFetchError) {
                             _hideProgressOverlay();
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              try {
-                                rootNav.pop();
-                              } catch (_) {}
-                            });
+                            if (!isClosing) {
+                              if (!ctx.mounted) return;
+                              isClosing = true;
+                              Navigator.of(ctx).pop();
+                            }
                             if (mounted) {
                               setState(() {
                                 _songsFuture = fns.fetchSongs();
                               });
                             }
                             try {
-                              await auth.refreshRemoteUser();
+                              await auth.refreshRemoteUser(
+                                caller: 'songs.deleteBrowserFetchError',
+                              );
                             } catch (_) {}
                             messenger.showSnackBar(
                               SnackBar(
@@ -658,6 +660,8 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController();
     final artistCtrl = TextEditingController();
+    // Guard to prevent multiple close pops
+    var isClosing = false;
 
     await showDialog<void>(
       context: context,
@@ -681,15 +685,9 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                       alignment: Alignment.topRight,
                       child: GestureDetector(
                         onTap: () {
-                          final rootNav = Navigator.of(
-                            context,
-                            rootNavigator: true,
-                          );
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            try {
-                              rootNav.pop();
-                            } catch (_) {}
-                          });
+                          if (isClosing) return;
+                          isClosing = true;
+                          Navigator.of(ctx).pop();
                         },
                         child: Icon(Icons.close, color: kGold),
                       ),
@@ -796,11 +794,6 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   final messenger = ScaffoldMessenger.of(
                                     context,
                                   );
-                                  // Capture root navigator now; avoid context lookups later
-                                  final rootNav = Navigator.of(
-                                    context,
-                                    rootNavigator: true,
-                                  );
 
                                   try {
                                     final currentRemote = auth.remoteUser;
@@ -843,14 +836,18 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                       _songsFuture = fns.fetchSongs();
                                     });
                                     try {
-                                      await auth.refreshRemoteUser();
+                                      await auth.refreshRemoteUser(
+                                        caller: 'songs.submit',
+                                      );
                                     } catch (_) {}
                                     _hideProgressOverlay();
+                                    if (!isClosing) {
+                                      if (!ctx.mounted) return;
+                                      isClosing = true;
+                                      Navigator.of(ctx).pop();
+                                    }
                                     WidgetsBinding.instance
                                         .addPostFrameCallback((_) {
-                                          try {
-                                            rootNav.pop();
-                                          } catch (_) {}
                                           messenger.showSnackBar(
                                             SnackBar(
                                               content: Text(
@@ -887,19 +884,21 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                         msg.contains('TypeError');
                                     if (kIsWeb && isBrowserFetchError) {
                                       _hideProgressOverlay();
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                            try {
-                                              rootNav.pop();
-                                            } catch (_) {}
-                                          });
+                                      if (!isClosing) {
+                                        if (!ctx.mounted) return;
+                                        isClosing = true;
+                                        Navigator.of(ctx).pop();
+                                      }
                                       if (mounted) {
                                         setState(() {
                                           _songsFuture = fns.fetchSongs();
                                         });
                                       }
                                       try {
-                                        await auth.refreshRemoteUser();
+                                        await auth.refreshRemoteUser(
+                                          caller:
+                                              'songs.submitBrowserFetchError',
+                                        );
                                       } catch (_) {}
                                       messenger.showSnackBar(
                                         SnackBar(

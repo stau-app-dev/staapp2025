@@ -78,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = Provider.of<AuthService>(context, listen: false);
       // Fire-and-forget; refreshRemoteUser is safe when not signed in.
-      auth.refreshRemoteUser();
+      auth.refreshRemoteUser(caller: 'home.init');
     });
   }
 
@@ -107,10 +107,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // If the user navigated to the Song Requests page, refresh the remote
     // profile so the counters displayed there are up-to-date.
-    if (index == 1) {
-      final auth = Provider.of<AuthService>(context, listen: false);
-      auth.refreshRemoteUser();
-    }
+    // Redundant with songs.init (page-owned refresh), so skip here
+    // if (index == 1) {
+    //   final auth = Provider.of<AuthService>(context, listen: false);
+    //   auth.refreshRemoteUser(caller: 'home.navToSongs');
+    // }
   }
 
   @override
