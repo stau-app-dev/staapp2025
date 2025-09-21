@@ -27,21 +27,17 @@ class ProfilePage extends StatelessWidget {
       return Color.fromARGB(255, rr, gg, bb);
     }
 
-    // Helper to build avatar: network photo if available, otherwise first initial in CircleAvatar.
-    Widget avatar() {
-      if (photoUrl != null && photoUrl.isNotEmpty) {
-        return ClipOval(
-          child: Image.network(
-            photoUrl,
-            width: 120,
-            height: 120,
-            fit: BoxFit.cover,
-            errorBuilder: (c, e, s) =>
-                Icon(Icons.school, size: 64, color: kMaroonAccent),
-          ),
-        );
-      }
+    bool isValidPhotoUrl(String? url) {
+      if (url == null) return false;
+      final u = Uri.tryParse(url.trim());
+      if (u == null) return false;
+      if (!(u.scheme == 'http' || u.scheme == 'https')) return false;
+      if (u.host.isEmpty) return false;
+      return true;
+    }
 
+    // Helper to build avatar: network photo if valid, otherwise initials.
+    Widget avatar() {
       final nameKey = (displayName.isNotEmpty ? displayName : email).isNotEmpty
           ? (displayName.isNotEmpty ? displayName : email)
           : 'A';
@@ -50,14 +46,29 @@ class ProfilePage extends StatelessWidget {
           : 'A';
       final bg = deterministicPastel(nameKey);
 
-      return CircleAvatar(
+      final initialsAvatar = CircleAvatar(
         radius: 60,
         backgroundColor: bg,
         child: Text(
           firstInitial,
-          style: TextStyle(fontSize: 40, color: Colors.white),
+          style: const TextStyle(fontSize: 40, color: Colors.white),
         ),
       );
+
+      if (isValidPhotoUrl(photoUrl)) {
+        return ClipOval(
+          child: Image.network(
+            photoUrl!.trim(),
+            width: 120,
+            height: 120,
+            fit: BoxFit.cover,
+            // If loading fails (CORS/404/etc.), fall back to initials
+            errorBuilder: (c, e, s) => initialsAvatar,
+          ),
+        );
+      }
+
+      return initialsAvatar;
     }
 
     // (display name parsing handled inline where needed)

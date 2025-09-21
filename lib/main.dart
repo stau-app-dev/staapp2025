@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'core/firebase_bootstrap.dart';
 // You can still import shared styles/theme directly, or via common/ barrels.
 import 'common/styles.dart';
@@ -12,6 +11,7 @@ import 'package:staapp2025/features/profile/ui/profile_page.dart';
 import 'package:provider/provider.dart';
 import 'package:staapp2025/features/auth/auth_service.dart';
 import 'package:staapp2025/features/auth/guard.dart';
+import 'package:staapp2025/common/pwa.dart' as pwa;
 
 // no async zone hacks to avoid zone mismatch errors
 
@@ -24,8 +24,14 @@ Future<void> main() async {
     // ignore: avoid_print
     print('FlutterError: \\n${details.exceptionAsString()}\\n${details.stack}');
   };
-  await bootstrapFirebase();
-  assert(Firebase.apps.isNotEmpty, 'Firebase failed to initialize');
+  try {
+    await bootstrapFirebase();
+  } catch (e, st) {
+    // ignore: avoid_print
+    print('bootstrapFirebase failed: $e');
+    // ignore: avoid_print
+    print(st);
+  }
   // Firebase initialized
   runApp(const StaApp());
 }
@@ -109,6 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final extraBottom = pwa.extraNavBarBottomPadding();
     return Scaffold(
       body: SafeArea(
         child: Builder(
@@ -141,21 +148,26 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: kMaroon, // sampled maroon
-        selectedItemColor: kGold, // sampled gold
-        unselectedItemColor: kWhite,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.music_note),
-            label: 'Song Requests',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
+      bottomNavigationBar: Container(
+        color: kMaroon,
+        padding: EdgeInsets.only(bottom: extraBottom),
+        child: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: kMaroon, // sampled maroon
+          elevation: extraBottom > 0 ? 0 : 8,
+          selectedItemColor: kGold, // sampled gold
+          unselectedItemColor: kWhite,
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.music_note),
+              label: 'Song Requests',
+            ),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
       ),
     );
   }

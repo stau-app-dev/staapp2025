@@ -1,0 +1,1 @@
+double pwaExtraNavBarBottomPadding() => 0;

@@ -94,6 +94,127 @@
 			"command": "flutter build web --release --base-href /staapp2025/",
 			"isBackground": false,
 			"group": "build"
+		},
+		{
+			"label": "Rebuild web with subdir PWA settings",
+			"type": "shell",
+			"command": "flutter clean && flutter build web --release --base-href /staapp2025/ --pwa-strategy offline-first",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test after intl init",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Rebuild web after intl init",
+			"type": "shell",
+			"command": "flutter build web --release --base-href /staapp2025/",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test after removing intl from WelcomeBlock",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Analyze after web bootstrap changes",
+			"type": "shell",
+			"command": "flutter analyze",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test after PWA padding",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Re-analyze and test after lint ignore",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run tests after PWA padding",
+			"type": "shell",
+			"command": "flutter test",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Analyze after navbar color wrap",
+			"type": "shell",
+			"command": "flutter analyze",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Analyze after elevation removal",
+			"type": "shell",
+			"command": "flutter analyze",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Analyze and test avatar fallback",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Re-analyze and test avatar fallback",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Re-run analyzer after file reopen",
+			"type": "shell",
+			"command": "flutter analyze && flutter test",
+			"isBackground": false,
+			"problemMatcher": [
+				"$flutter-analyze"
+			],
+			"group": "build"
 		}
 	]
 }

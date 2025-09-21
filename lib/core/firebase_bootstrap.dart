@@ -6,7 +6,8 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 /// - Web: initializes with explicit options and sets LOCAL persistence.
 /// - iOS/Android: initializes using platform config files (plist/json).
 Future<void> bootstrapFirebase() async {
-  if (Firebase.apps.isNotEmpty) return;
+  // On web, avoid touching Firebase.apps before initialization, as the
+  // web plugin may not have loaded JS interop yet. Initialize first.
   if (kIsWeb) {
     const options = FirebaseOptions(
       apiKey: 'AIzaSyD6g_zu-fCz86WRbsqkJlmVlhK5nxB9UVM',
@@ -24,6 +25,8 @@ Future<void> bootstrapFirebase() async {
     } catch (_) {}
     return;
   }
+  // Non-web: check if already initialized, then initialize if needed.
+  if (Firebase.apps.isNotEmpty) return;
   try {
     await Firebase.initializeApp();
   } catch (_) {}
