@@ -474,6 +474,8 @@ String normalizeForProfanity(String input) {
     '!': 'i',
     '|': 'i',
     '+': 't',
+    // '$' is often used for 's' (e.g., '@$$' -> 'ass', '$hit' -> 'shit')
+    r'$': 's',
   };
   final buf = StringBuffer();
   final s = input.toLowerCase();
@@ -515,6 +517,10 @@ String normalizeForProfanity(String input) {
 RegExp? _buildProfanityPattern(String word) {
   final w = normalizeForProfanity(word.trim());
   if (w.isEmpty) return null;
+  // Skip degenerate patterns that normalize to a single alphanumeric
+  // character to avoid false-positives (e.g., '@$$' incorrectly -> 'a').
+  final alnumLen = w.replaceAll(RegExp(r'[^a-z0-9]'), '').length;
+  if (alnumLen <= 1) return null;
   // Split on whitespace, escape tokens, join with flexible whitespace.
   final parts = w.split(RegExp(r'\s+')).map((p) => RegExp.escape(p)).toList();
   final core = parts.join(r'\s+');
