@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:staapp2025/features/auth/auth_service.dart';
 import 'package:staapp2025/features/song_requests/data/profanity.dart';
 import 'package:staapp2025/features/auth/guard.dart';
+import 'package:staapp2025/common/pwa.dart' as pwa;
 
 class SongRequestsPage extends StatefulWidget {
   const SongRequestsPage({super.key});
@@ -253,6 +254,9 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                 return RefreshIndicator(
                   onRefresh: _refreshPage,
                   child: ListView.separated(
+                    padding: EdgeInsets.only(
+                      bottom: kPage + pwa.extraNavBarBottomPadding(),
+                    ),
                     itemCount: songs.length,
                     separatorBuilder: (context, index) =>
                         const SizedBox(height: 10),
