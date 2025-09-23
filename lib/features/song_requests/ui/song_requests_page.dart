@@ -697,6 +697,8 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
     final artistCtrl = TextEditingController();
     // Guard to prevent multiple close pops
     var isClosing = false;
+    // Require student acknowledgment before enabling submit
+    var acknowledged = false;
 
     await showDialog<void>(
       context: context,
@@ -717,278 +719,312 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
             child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(mainInsidePadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: GestureDetector(
-                        onTap: () {
-                          if (isClosing) return;
-                          isClosing = true;
-                          Navigator.of(ctx).pop();
-                        },
-                        child: Icon(Icons.close, color: kGold),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text('Add Song', style: kSectionTitleSmall),
-                    const SizedBox(height: 18),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Form(
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          key: formKey,
-                          child: Column(
-                            children: [
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'Song Name',
-                                  style: kSectionTitleSmall.copyWith(
-                                    color: kMaroon,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: nameCtrl,
-                                decoration: InputDecoration(
-                                  hintText: 'Never Gonna Give You Up',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      kInnerRadius,
-                                    ),
-                                    borderSide: BorderSide(color: kMaroon),
-                                  ),
-                                ),
-                                validator: (v) {
-                                  final text = v?.trim() ?? '';
-                                  if (text.isEmpty) {
-                                    return 'Please enter a song name';
-                                  }
-                                  if (containsProfanity(text)) {
-                                    return 'Please remove inappropriate language.';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 14),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'Artist Name',
-                                  style: kSectionTitleSmall.copyWith(
-                                    color: kMaroon,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: artistCtrl,
-                                decoration: InputDecoration(
-                                  hintText: 'Rick Astley',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(
-                                      kInnerRadius,
-                                    ),
-                                    borderSide: BorderSide(color: kMaroon),
-                                  ),
-                                ),
-                                validator: (v) {
-                                  final text = v?.trim() ?? '';
-                                  if (text.isEmpty) {
-                                    return 'Please enter an artist name';
-                                  }
-                                  if (containsProfanity(text)) {
-                                    return 'Please remove inappropriate language.';
-                                  }
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 18),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  'Submitted by: $userEmail',
-                                  style: kPlaceholderText.copyWith(
-                                    color: kMaroon,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              ElevatedButton(
-                                onPressed: () async {
-                                  if (!(formKey.currentState?.validate() ??
-                                      false)) {
-                                    return;
-                                  }
-                                  final artist = artistCtrl.text.trim();
-                                  final name = nameCtrl.text.trim();
-                                  final creatorEmail = auth.email ?? '';
-
-                                  // Show global progress overlay (dismissed via _hideProgressOverlay)
-                                  _showProgressOverlay(context);
-                                  final messenger = ScaffoldMessenger.of(
-                                    context,
-                                  );
-
-                                  try {
-                                    final currentRemote = auth.remoteUser;
-                                    final dynamic rc =
-                                        currentRemote?['songRequestCount'];
-                                    int? remainingRequests;
-                                    if (rc is int) {
-                                      remainingRequests = rc;
-                                    }
-                                    if (rc is String) {
-                                      remainingRequests = int.tryParse(rc);
-                                    }
-                                    if (remainingRequests != null &&
-                                        remainingRequests <= 0) {
-                                      debugPrint(
-                                        '[SongRequests] Add song blocked: no song requests left for user',
-                                      );
-                                      _hideProgressOverlay();
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'No song requests left',
-                                            style: kBodyText,
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
-
-                                    await fns.submitSong(
-                                      artist: artist,
-                                      name: name,
-                                      creatorEmail: creatorEmail,
-                                    );
-                                    debugPrint(
-                                      '[SongRequests] submitSong success: name="$name", artist="$artist", creator="$creatorEmail"',
-                                    );
-                                    if (!mounted) return;
-                                    setState(() {
-                                      _songsFuture = fns.fetchSongs();
-                                    });
-                                    try {
-                                      await auth.refreshRemoteUser(
-                                        caller: 'songs.submit',
-                                      );
-                                    } catch (_) {}
-                                    _hideProgressOverlay();
-                                    if (!isClosing) {
-                                      if (!ctx.mounted) return;
-                                      isClosing = true;
-                                      Navigator.of(ctx).pop();
-                                    }
-                                    WidgetsBinding.instance
-                                        .addPostFrameCallback((_) {
-                                          messenger.showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                'Song submitted — thank you!',
-                                                style: kBodyText,
-                                              ),
-                                            ),
-                                          );
-                                        });
-                                  } catch (e, st) {
-                                    debugPrint(
-                                      '[SongRequests] submitSong error: ${e.toString()}',
-                                    );
-                                    try {
-                                      if (!kIsWeb) {
-                                        debugPrintStack(stackTrace: st);
-                                      } else {
-                                        debugPrint('[stack] $st');
-                                      }
-                                    } catch (_) {
-                                      debugPrint('[stack print failed]');
-                                    }
-                                    // On web, a CORS/preflight issue can cause the browser
-                                    // client to report "Failed to fetch" even if the Cloud Function
-                                    // completed. Since we've seen the song actually get added,
-                                    // treat this specific case optimistically: close the dialog,
-                                    // refresh the list, and inform the user.
-                                    final msg = e.toString();
-                                    final isBrowserFetchError =
-                                        msg.contains('Failed to fetch') ||
-                                        msg.contains('TimeoutException') ||
-                                        msg.contains('NetworkError') ||
-                                        msg.contains('XMLHttpRequest error') ||
-                                        msg.contains('TypeError');
-                                    if (kIsWeb && isBrowserFetchError) {
-                                      _hideProgressOverlay();
-                                      if (!isClosing) {
-                                        if (!ctx.mounted) return;
-                                        isClosing = true;
-                                        Navigator.of(ctx).pop();
-                                      }
-                                      if (mounted) {
-                                        setState(() {
-                                          _songsFuture = fns.fetchSongs();
-                                        });
-                                      }
-                                      try {
-                                        await auth.refreshRemoteUser(
-                                          caller:
-                                              'songs.submitBrowserFetchError',
-                                        );
-                                      } catch (_) {}
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Song submitted. Refreshing list…',
-                                            style: kBodyText,
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    _hideProgressOverlay();
-                                    WidgetsBinding.instance.addPostFrameCallback((
-                                      _,
-                                    ) {
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'Failed to submit song: ${e.toString()}',
-                                            style: kBodyText,
-                                          ),
-                                        ),
-                                      );
-                                    });
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kGold,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: mainBorderRadius,
-                                  ),
-                                  padding: kButtonPadding,
-                                ),
-                                child: Text(
-                                  'Submit',
-                                  style: kSectionTitleSmall,
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              Text(
-                                'Note:\nAll song recommendations MUST be school appropriate, this means no explicit language or subjects.',
-                                textAlign: TextAlign.center,
-                                style: kPlaceholderText.copyWith(
-                                  color: kMaroon,
-                                ),
-                              ),
-                            ],
+                child: StatefulBuilder(
+                  builder: (ctx2, setStateDialog) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: GestureDetector(
+                            onTap: () {
+                              if (isClosing) return;
+                              isClosing = true;
+                              Navigator.of(ctx).pop();
+                            },
+                            child: Icon(Icons.close, color: kGold),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
+                        const SizedBox(height: 6),
+                        Text('Add Song', style: kSectionTitleSmall),
+                        const SizedBox(height: 18),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            child: Form(
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              key: formKey,
+                              child: Column(
+                                children: [
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'Song Name',
+                                      style: kSectionTitleSmall.copyWith(
+                                        color: kMaroon,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    controller: nameCtrl,
+                                    decoration: InputDecoration(
+                                      hintText: 'Never Gonna Give You Up',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          kInnerRadius,
+                                        ),
+                                        borderSide: BorderSide(color: kMaroon),
+                                      ),
+                                    ),
+                                    validator: (v) {
+                                      final text = v?.trim() ?? '';
+                                      if (text.isEmpty) {
+                                        return 'Please enter a song name';
+                                      }
+                                      if (containsProfanity(text)) {
+                                        return 'Please remove inappropriate language.';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'Artist Name',
+                                      style: kSectionTitleSmall.copyWith(
+                                        color: kMaroon,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    controller: artistCtrl,
+                                    decoration: InputDecoration(
+                                      hintText: 'Rick Astley',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          kInnerRadius,
+                                        ),
+                                        borderSide: BorderSide(color: kMaroon),
+                                      ),
+                                    ),
+                                    validator: (v) {
+                                      final text = v?.trim() ?? '';
+                                      if (text.isEmpty) {
+                                        return 'Please enter an artist name';
+                                      }
+                                      if (containsProfanity(text)) {
+                                        return 'Please remove inappropriate language.';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'Submitted by: $userEmail',
+                                      style: kPlaceholderText.copyWith(
+                                        color: kMaroon,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  // Acknowledgement checkbox
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Checkbox(
+                                        value: acknowledged,
+                                        onChanged: (v) => setStateDialog(() {
+                                          acknowledged = v ?? false;
+                                        }),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          'I acknowledge that my school email will be recorded with this request and that submitting inappropriate content may result in disciplinary action.',
+                                          style: kAnnouncementBody.copyWith(
+                                            color: kMaroon,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ElevatedButton(
+                                    onPressed: acknowledged
+                                        ? () async {
+                                            if (!(formKey.currentState
+                                                    ?.validate() ??
+                                                false)) {
+                                              return;
+                                            }
+                                            final artist = artistCtrl.text
+                                                .trim();
+                                            final name = nameCtrl.text.trim();
+                                            final creatorEmail =
+                                                auth.email ?? '';
+
+                                            // Show global progress overlay (dismissed via _hideProgressOverlay)
+                                            _showProgressOverlay(context);
+                                            final messenger =
+                                                ScaffoldMessenger.of(context);
+
+                                            try {
+                                              final currentRemote =
+                                                  auth.remoteUser;
+                                              final dynamic rc =
+                                                  currentRemote?['songRequestCount'];
+                                              int? remainingRequests;
+                                              if (rc is int) {
+                                                remainingRequests = rc;
+                                              }
+                                              if (rc is String) {
+                                                remainingRequests =
+                                                    int.tryParse(rc);
+                                              }
+                                              if (remainingRequests != null &&
+                                                  remainingRequests <= 0) {
+                                                _hideProgressOverlay();
+                                                messenger.showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'No song requests left',
+                                                      style: kBodyText,
+                                                    ),
+                                                  ),
+                                                );
+                                                return;
+                                              }
+
+                                              await fns.submitSong(
+                                                artist: artist,
+                                                name: name,
+                                                creatorEmail: creatorEmail,
+                                              );
+                                              if (!mounted) return;
+                                              setState(() {
+                                                _songsFuture = fns.fetchSongs();
+                                              });
+                                              try {
+                                                await auth.refreshRemoteUser(
+                                                  caller: 'songs.submit',
+                                                );
+                                              } catch (_) {}
+                                              _hideProgressOverlay();
+                                              if (!isClosing) {
+                                                if (!ctx.mounted) return;
+                                                isClosing = true;
+                                                Navigator.of(ctx).pop();
+                                              }
+                                              WidgetsBinding.instance
+                                                  .addPostFrameCallback((_) {
+                                                    messenger.showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          'Song submitted — thank you!',
+                                                          style: kBodyText,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  });
+                                            } catch (e, st) {
+                                              debugPrint(
+                                                '[SongRequests] submitSong error: ${e.toString()}',
+                                              );
+                                              try {
+                                                if (!kIsWeb) {
+                                                  debugPrintStack(
+                                                    stackTrace: st,
+                                                  );
+                                                } else {
+                                                  debugPrint('[stack] $st');
+                                                }
+                                              } catch (_) {
+                                                debugPrint(
+                                                  '[stack print failed]',
+                                                );
+                                              }
+                                              // On web, a CORS/preflight issue can cause the browser
+                                              // client to report "Failed to fetch" even if the Cloud Function
+                                              // completed. Since we've seen the song actually get added,
+                                              // treat this specific case optimistically: close the dialog,
+                                              // refresh the list, and inform the user.
+                                              final msg = e.toString();
+                                              final isBrowserFetchError =
+                                                  msg.contains(
+                                                    'Failed to fetch',
+                                                  ) ||
+                                                  msg.contains(
+                                                    'TimeoutException',
+                                                  ) ||
+                                                  msg.contains(
+                                                    'NetworkError',
+                                                  ) ||
+                                                  msg.contains(
+                                                    'XMLHttpRequest error',
+                                                  ) ||
+                                                  msg.contains('TypeError');
+                                              if (kIsWeb &&
+                                                  isBrowserFetchError) {
+                                                _hideProgressOverlay();
+                                                if (!isClosing) {
+                                                  if (!ctx.mounted) return;
+                                                  isClosing = true;
+                                                  Navigator.of(ctx).pop();
+                                                }
+                                                if (mounted) {
+                                                  setState(() {
+                                                    _songsFuture = fns
+                                                        .fetchSongs();
+                                                  });
+                                                }
+                                                try {
+                                                  await auth.refreshRemoteUser(
+                                                    caller:
+                                                        'songs.submitBrowserFetchError',
+                                                  );
+                                                } catch (_) {}
+                                                messenger.showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(
+                                                      'Song submitted. Refreshing list…',
+                                                      style: kBodyText,
+                                                    ),
+                                                  ),
+                                                );
+                                                return;
+                                              }
+                                              _hideProgressOverlay();
+                                              WidgetsBinding.instance
+                                                  .addPostFrameCallback((_) {
+                                                    messenger.showSnackBar(
+                                                      SnackBar(
+                                                        content: Text(
+                                                          'Failed to submit song: ${e.toString()}',
+                                                          style: kBodyText,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  });
+                                            }
+                                          }
+                                        : null,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: kGold,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: mainBorderRadius,
+                                      ),
+                                      padding: kButtonPadding,
+                                    ),
+                                    child: Text(
+                                      'Submit',
+                                      style: kSectionTitleSmall,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
