@@ -114,7 +114,9 @@ Future<List<Map<String, dynamic>>> fetchSongs({http.Client? client}) async {
 Future<Map<String, dynamic>> submitSong({
   required String artist,
   required String name,
-  required String creatorEmail,
+  // 2025-09 migration: backend now authenticates via user doc UUID instead of email.
+  // Field renamed from creatorEmail -> creatorUuid to call addSongNew.
+  required String creatorUuid,
   http.Client? client,
 }) async {
   client ??= http.Client();
@@ -124,7 +126,7 @@ Future<Map<String, dynamic>> submitSong({
   final body = json.encode({
     'artist': artist,
     'name': name,
-    'creatorEmail': creatorEmail,
+    'creatorUuid': creatorUuid,
   });
   final resp = await client
       .post(url, headers: {'Content-Type': 'text/plain'}, body: body)
@@ -157,14 +159,16 @@ Future<Map<String, dynamic>> submitSong({
 
 Future<Map<String, dynamic>> upvoteSong({
   required String songId,
-  required String userEmail,
+  // 2025-09 migration: backend now authenticates via user doc UUID instead of email.
+  // Field renamed from userEmail -> userUuid to call upvoteSongNew.
+  required String userUuid,
   http.Client? client,
 }) async {
   client ??= http.Client();
   final url = Uri.parse(
     'https://us-central1-staugustinechsapp.cloudfunctions.net/upvoteSongNew',
   );
-  final body = json.encode({'songId': songId, 'userEmail': userEmail});
+  final body = json.encode({'songId': songId, 'userUuid': userUuid});
   final resp = await client
       .post(url, headers: {'Content-Type': 'text/plain'}, body: body)
       .timeout(const Duration(seconds: 20));

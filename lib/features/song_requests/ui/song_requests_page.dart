@@ -307,12 +307,12 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   );
                                   return;
                                 }
-                                final userEmail = auth.email ?? '';
-                                if (userEmail.isEmpty) {
+                                final userUuid = auth.userId ?? '';
+                                if (userUuid.isEmpty) {
                                   messenger.showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        'Missing user email',
+                                        'Missing user id',
                                         style: kBodyText,
                                       ),
                                     ),
@@ -339,7 +339,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
 
                                   await fns.upvoteSong(
                                     songId: id,
-                                    userEmail: userEmail,
+                                    userUuid: userUuid,
                                   );
                                   if (!context.mounted) return;
                                   setState(() {
@@ -856,8 +856,22 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                             final artist = artistCtrl.text
                                                 .trim();
                                             final name = nameCtrl.text.trim();
-                                            final creatorEmail =
-                                                auth.email ?? '';
+                                            // Backend now requires UUID (Firebase UID) instead of email
+                                            final creatorUuid =
+                                                auth.userId ?? '';
+                                            if (creatorUuid.isEmpty) {
+                                              final messenger =
+                                                  ScaffoldMessenger.of(context);
+                                              messenger.showSnackBar(
+                                                SnackBar(
+                                                  content: Text(
+                                                    'Missing user id',
+                                                    style: kBodyText,
+                                                  ),
+                                                ),
+                                              );
+                                              return;
+                                            }
 
                                             // Show global progress overlay (dismissed via _hideProgressOverlay)
                                             _showProgressOverlay(context);
@@ -894,7 +908,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                               await fns.submitSong(
                                                 artist: artist,
                                                 name: name,
-                                                creatorEmail: creatorEmail,
+                                                creatorUuid: creatorUuid,
                                               );
                                               if (!mounted) return;
                                               setState(() {
