@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:provider/provider.dart';
+
+import 'package:staapp2025/common/pwa.dart' as pwa;
 import 'package:staapp2025/common/styles.dart';
 import 'package:staapp2025/core/firebase_functions.dart' as fns;
-import 'package:provider/provider.dart';
 import 'package:staapp2025/features/auth/auth_service.dart';
-import 'package:staapp2025/features/song_requests/data/profanity.dart';
 import 'package:staapp2025/features/auth/guard.dart';
-import 'package:staapp2025/common/pwa.dart' as pwa;
+import 'package:staapp2025/features/song_requests/ui/song_card.dart';
+import 'package:staapp2025/features/song_requests/ui/song_request_dialogs.dart';
 
 class SongRequestsPage extends StatefulWidget {
   const SongRequestsPage({super.key});
@@ -17,12 +19,34 @@ class SongRequestsPage extends StatefulWidget {
 
 class _SongRequestsPageState extends State<SongRequestsPage> {
   late Future<List<Map<String, dynamic>>> _songsFuture;
-
-  // Simple, robust progress overlay that doesn't rely on Navigator.
+  final _dialogOverlay = ProgressOverlayController();
   OverlayEntry? _progressOverlay;
-  void _showProgressOverlay(BuildContext context) {
+
+  @override
+  void initState() {
+    super.initState();
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final uid = auth.userId;
+    _songsFuture = (uid == null || uid.isEmpty)
+        ? Future.value(<Map<String, dynamic>>[])
+        : fns.fetchSongs(userUuid: uid);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = Provider.of<AuthService>(context, listen: false);
+      auth.refreshRemoteUser(caller: 'songs.init');
+    });
+  }
+
+  // (legacy overlay method removed in favor of _showProgressOverlayFrom)
+
+  void _hideProgressOverlay() {
+    try {
+      _progressOverlay?.remove();
+    } catch (_) {}
+    _progressOverlay = null;
+  }
+
+  void _showProgressOverlayFrom(OverlayState? overlay) {
     if (_progressOverlay != null) return;
-    final overlay = Overlay.maybeOf(context, rootOverlay: true);
     if (overlay == null) return;
     _progressOverlay = OverlayEntry(
       builder: (_) => Stack(
@@ -32,74 +56,33 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
         ],
       ),
     );
-    overlay.insert(_progressOverlay!);
+    try {
+      overlay.insert(_progressOverlay!);
+    } catch (_) {}
   }
 
-  void _hideProgressOverlay() {
-    void removeOnce() {
-      try {
-        _progressOverlay?.remove();
-      } catch (_) {}
-      _progressOverlay = null;
-    }
-
-    // Remove now, on next frame, and after a short delay to be extra safe.
-    removeOnce();
-    WidgetsBinding.instance.addPostFrameCallback((_) => removeOnce());
-    Future.delayed(const Duration(milliseconds: 60), removeOnce);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final uid = auth.userId;
-    // Use new UUID-authenticated fetch; if no uid yet (not signed in), start with empty list future.
-    _songsFuture = (uid == null || uid.isEmpty)
-        ? Future.value(<Map<String, dynamic>>[])
-        : fns.fetchSongs(userUuid: uid);
-    // When this page is first created, ensure we refresh the remote user
-    // profile so counters (songRequestCount/songUpvoteCount) are available
-    // as soon as possible.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = Provider.of<AuthService>(context, listen: false);
-      // Fire-and-forget; refreshRemoteUser is safe when not signed in.
-      auth.refreshRemoteUser(caller: 'songs.init');
-    });
-  }
-
-  /// Refreshes the songs list and the authenticated user's remote profile.
-  /// Used by the pull-to-refresh indicator.
   Future<void> _refreshPage() async {
     final auth = Provider.of<AuthService>(context, listen: false);
     try {
-      // Refresh remote user first so UI counters update quickly
       await auth.refreshRemoteUser(caller: 'songs.pullToRefresh');
     } catch (_) {}
-
-    // Reload songs from the server and wait for the result so the
-    // RefreshIndicator's spinner correlates with network activity.
     final uid = auth.userId;
     final future = (uid == null || uid.isEmpty)
         ? Future.value(<Map<String, dynamic>>[])
         : fns.fetchSongs(userUuid: uid);
-    setState(() {
-      _songsFuture = future;
-    });
+    setState(() => _songsFuture = future);
     try {
       await future;
     } catch (_) {}
   }
 
+  // (helper removed; inline usage now for clarity and to avoid context-after-await lints)
+
   @override
   Widget build(BuildContext context) {
-    // Listen to AuthService so UI updates when remoteUser changes
     final auth = Provider.of<AuthService>(context);
-
     final songRequestCount = auth.songRequestCount;
     final songUpvoteCount = auth.songUpvoteCount;
-    // Disable add button only when signed in AND explicitly at 0 remaining.
-    // If not signed in or value is not yet loaded (null), keep enabled to prompt sign-in/refresh.
     final canAddNow =
         !(auth.isSignedIn &&
             (songRequestCount != null && songRequestCount <= 0));
@@ -121,29 +104,27 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Add Song button opens a modal dialog
           Center(
             child: ElevatedButton.icon(
               onPressed: canAddNow
                   ? () async {
-                      // Capture messenger before any awaits to avoid using context after async gaps.
-                      final messenger = ScaffoldMessenger.of(context);
-                      // Ensure the user is signed in; if not, show login.
-                      final ok = await ensureSignedIn(context);
-                      if (!context.mounted) return;
-                      if (!ok) return;
-                      final auth = Provider.of<AuthService>(
-                        context,
+                      // Capture context-dependent singletons before async gap
+                      final ctx = context;
+                      final messenger = ScaffoldMessenger.of(ctx);
+                      final authLocal = Provider.of<AuthService>(
+                        ctx,
                         listen: false,
                       );
-                      // Refresh remote user to ensure we have up-to-date counters.
+                      // Perform auth guard (may push login). We deliberately do not
+                      // use ctx afterwards except inside a post-frame callback.
+                      final ok = await ensureSignedIn(ctx);
+                      if (!mounted || !ok) return;
                       try {
-                        await auth.refreshRemoteUser(
+                        await authLocal.refreshRemoteUser(
                           caller: 'songs.addButtonPrefetch',
                         );
                       } catch (_) {}
-                      final remaining = auth.songRequestCount ?? 0;
+                      final remaining = authLocal.songRequestCount ?? 0;
                       if (remaining <= 0) {
                         messenger.showSnackBar(
                           SnackBar(
@@ -155,15 +136,29 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                         );
                         return;
                       }
-                      if (!context.mounted) return;
-                      _showAddSongDialog(context);
+                      if (!mounted) return;
+                      // Defer showing dialog to next frame to satisfy lints about context reuse after await.
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        showAddSongDialog(
+                          context: ctx,
+                          overlay: _dialogOverlay,
+                          onDataChanged: () {
+                            final uid = authLocal.userId;
+                            if (uid != null && uid.isNotEmpty) {
+                              setState(() {
+                                _songsFuture = fns.fetchSongs(userUuid: uid);
+                              });
+                            }
+                          },
+                        );
+                      });
                     }
                   : null,
               icon: const Icon(Icons.add),
-              label: Text('Add Song'),
+              label: const Text('Add Song'),
               style: ElevatedButton.styleFrom(
                 backgroundColor:
-                    // If signed in but no quota -> grey; otherwise gold to encourage action
                     (auth.isSignedIn &&
                         (songRequestCount != null && songRequestCount <= 0))
                     ? Colors.grey
@@ -173,12 +168,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // Show remaining counters when remoteUser is available. If the
-          // user is signed in but the remote profile is not yet fetched,
-          // show a small retry hint so they can trigger a refresh.
           if (auth.remoteUser != null) ...[
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -206,8 +196,6 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                 const SizedBox(width: 12),
                 TextButton(
                   onPressed: () async {
-                    // Capture messenger early to avoid using BuildContext after
-                    // awaiting (fixes use_build_context_synchronously).
                     final messenger = ScaffoldMessenger.of(context);
                     try {
                       await auth.refreshRemoteUser(caller: 'songs.upvote');
@@ -218,25 +206,16 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                       );
                     } catch (e) {
                       messenger.showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Failed to refresh profile: ${e.toString()}',
-                            style: kBodyText,
-                          ),
-                        ),
+                        SnackBar(content: Text('Failed: $e', style: kBodyText)),
                       );
                     }
                   },
-                  child: Text(
-                    'Retry',
-                    style: kWelcomeTitle.copyWith(color: kGold),
-                  ),
+                  child: const Text('Retry'),
                 ),
               ],
             ),
             const SizedBox(height: 12),
           ],
-
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
               future: _songsFuture,
@@ -258,7 +237,6 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                     child: Text('No song requests', style: kPlaceholderText),
                   );
                 }
-
                 return RefreshIndicator(
                   onRefresh: _refreshPage,
                   child: ListView.separated(
@@ -266,8 +244,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                       bottom: kPage + pwa.extraNavBarBottomPadding(),
                     ),
                     itemCount: songs.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 10),
+                    separatorBuilder: (c, i) => const SizedBox(height: 10),
                     itemBuilder: (context, idx) {
                       final s = songs[idx];
                       final artist = (s['artist'] ?? '').toString().trim();
@@ -275,36 +252,44 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                       final upvotes = s['upvotes'] is int
                           ? s['upvotes'] as int
                           : int.tryParse(s['upvotes']?.toString() ?? '0') ?? 0;
-                      final canDelete = auth.isAdmin;
                       final id = (s['id'] ?? '').toString();
-
-                      // Disable upvote if signed in and no upvotes left; keep enabled when not signed in
+                      final canDelete = auth.isAdmin;
                       final canUpvoteNow =
                           !(auth.isSignedIn &&
                               (songUpvoteCount != null &&
                                   songUpvoteCount <= 0));
 
-                      final card = _SongCard(
+                      final messenger = ScaffoldMessenger.of(
+                        context,
+                      ); // capture before awaits
+                      final authRead = Provider.of<AuthService>(
+                        context,
+                        listen: false,
+                      );
+                      final card = SongCard(
                         title: name,
                         subtitle: 'By: $artist',
                         upvotes: upvotes,
                         onUpvote: canUpvoteNow
                             ? () async {
-                                // Capture messenger as early as possible
-                                final messenger = ScaffoldMessenger.of(context);
-                                final ok = await ensureSignedIn(context);
-                                if (!context.mounted) return;
-                                if (!ok) return;
-                                final auth = Provider.of<AuthService>(
-                                  context,
-                                  listen: false,
+                                // Capture all context-derived objects BEFORE awaits
+                                final ctxUpvote = context; // alias for clarity
+                                final overlayState = Overlay.maybeOf(
+                                  ctxUpvote,
+                                  rootOverlay: true,
                                 );
+                                final localId = id;
+                                final initialUserUuid = authRead.userId ?? '';
+                                final signedIn = await ensureSignedIn(
+                                  ctxUpvote,
+                                );
+                                if (!mounted || !signedIn) return;
                                 try {
-                                  await auth.refreshRemoteUser(
+                                  await authRead.refreshRemoteUser(
                                     caller: 'songs.upvoteOptimistic',
                                   );
                                 } catch (_) {}
-                                if (id.isEmpty) {
+                                if (localId.isEmpty) {
                                   messenger.showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -315,8 +300,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   );
                                   return;
                                 }
-                                final userUuid = auth.userId ?? '';
-                                if (userUuid.isEmpty) {
+                                if (initialUserUuid.isEmpty) {
                                   messenger.showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -327,11 +311,10 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   );
                                   return;
                                 }
-                                if (!context.mounted) return;
-                                _showProgressOverlay(context);
+                                _showProgressOverlayFrom(overlayState);
                                 try {
                                   final remainingUpvotes =
-                                      auth.songUpvoteCount ?? 0;
+                                      authRead.songUpvoteCount ?? 0;
                                   if (remainingUpvotes <= 0) {
                                     _hideProgressOverlay();
                                     messenger.showSnackBar(
@@ -344,13 +327,12 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     );
                                     return;
                                   }
-
                                   await fns.upvoteSong(
-                                    songId: id,
-                                    userUuid: userUuid,
+                                    songId: localId,
+                                    userUuid: initialUserUuid,
                                   );
-                                  if (!context.mounted) return;
-                                  final uid2 = auth.userId;
+                                  if (!mounted) return;
+                                  final uid2 = authRead.userId;
                                   if (uid2 != null && uid2.isNotEmpty) {
                                     setState(() {
                                       _songsFuture = fns.fetchSongs(
@@ -359,26 +341,23 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     });
                                   }
                                   try {
-                                    await auth.refreshRemoteUser(
+                                    await authRead.refreshRemoteUser(
                                       caller: 'songs.deleteOptimistic',
                                     );
                                   } catch (_) {}
                                   _hideProgressOverlay();
-                                  WidgetsBinding.instance.addPostFrameCallback((
-                                    _,
-                                  ) {
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Upvoted!',
-                                          style: kBodyText,
-                                        ),
+                                  if (!mounted) return;
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Upvoted!',
+                                        style: kBodyText,
                                       ),
-                                    );
-                                  });
+                                    ),
+                                  );
                                 } catch (e, st) {
                                   debugPrint(
-                                    '[SongRequests] upvoteSong error: ${e.toString()}',
+                                    '[SongRequests] upvoteSong error: $e',
                                   );
                                   try {
                                     if (!kIsWeb) {
@@ -386,9 +365,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     } else {
                                       debugPrint('[stack] $st');
                                     }
-                                  } catch (_) {
-                                    debugPrint('[stack print failed]');
-                                  }
+                                  } catch (_) {}
                                   final msg = e.toString();
                                   final isBrowserFetchError =
                                       msg.contains('Failed to fetch') ||
@@ -399,7 +376,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   if (kIsWeb && isBrowserFetchError) {
                                     _hideProgressOverlay();
                                     if (mounted) {
-                                      final uid3 = auth.userId;
+                                      final uid3 = authRead.userId;
                                       if (uid3 != null && uid3.isNotEmpty) {
                                         setState(() {
                                           _songsFuture = fns.fetchSongs(
@@ -409,7 +386,7 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                       }
                                     }
                                     try {
-                                      await auth.refreshRemoteUser();
+                                      await authRead.refreshRemoteUser();
                                     } catch (_) {}
                                     messenger.showSnackBar(
                                       SnackBar(
@@ -422,27 +399,37 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     return;
                                   }
                                   _hideProgressOverlay();
-                                  WidgetsBinding.instance.addPostFrameCallback((
-                                    _,
-                                  ) {
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text(
-                                          'Failed to upvote: ${e.toString()}',
-                                          style: kBodyText,
-                                        ),
+                                  if (!mounted) return;
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Failed to upvote: $e',
+                                        style: kBodyText,
                                       ),
-                                    );
-                                  });
+                                    ),
+                                  );
                                 }
                               }
                             : null,
                       );
 
                       if (!canDelete) return card;
-
                       return GestureDetector(
-                        onLongPress: () => _showDeleteDialog(context, s),
+                        onLongPress: () => showDeleteSongDialog(
+                          context: context,
+                          song: s,
+                          overlay: _dialogOverlay,
+                          onDataChanged: () {
+                            final uidReload = auth.userId;
+                            if (uidReload != null && uidReload.isNotEmpty) {
+                              setState(() {
+                                _songsFuture = fns.fetchSongs(
+                                  userUuid: uidReload,
+                                );
+                              });
+                            }
+                          },
+                        ),
                         child: card,
                       );
                     },
@@ -455,718 +442,6 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
       ),
     );
   }
-
-  Future<void> _showDeleteDialog(
-    BuildContext context,
-    Map<String, dynamic> song,
-  ) async {
-    // Guard against multiple rapid dismiss actions to avoid navigator races
-    var isClosing = false;
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final isAdmin = auth.isAdmin;
-    final name = (song['name'] ?? '').toString().trim();
-    final artist = (song['artist'] ?? '').toString().trim();
-    final creatorEmail = (song['creatorEmail'] ?? '').toString().trim();
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
-          ),
-          backgroundColor: kWhite,
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: mainBorderRadius,
-            side: BorderSide(color: kMaroon, width: 1.4),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: 560,
-              // Allow height to be comfortable but scroll when content exceeds.
-              maxHeight: 640,
-            ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(mainInsidePadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Align(
-                      alignment: Alignment.topRight,
-                      child: GestureDetector(
-                        onTap: () {
-                          if (isClosing) return;
-                          isClosing = true;
-                          // Pop the dialog immediately using the builder context
-                          Navigator.of(ctx).pop();
-                        },
-                        child: Icon(Icons.close, color: kGold),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text('Delete Song', style: kSectionTitleSmall),
-                    const SizedBox(height: 18),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Song Name',
-                              style: kSectionTitleSmall.copyWith(
-                                color: kMaroon,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              name,
-                              style: kBodyText.copyWith(color: kMaroon),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Artist Name',
-                              style: kSectionTitleSmall.copyWith(
-                                color: kMaroon,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              artist,
-                              style: kBodyText.copyWith(color: kMaroon),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Creator Email',
-                              style: kSectionTitleSmall.copyWith(
-                                color: kMaroon,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              creatorEmail,
-                              style: kBodyText.copyWith(color: kMaroon),
-                            ),
-                            const SizedBox(height: 18),
-                            Text(
-                              'Note:\nIf a student continues to suggest inappropriate songs, admins can request for app privileges to be stripped.',
-                              textAlign: TextAlign.center,
-                              style: kPlaceholderText.copyWith(color: kMaroon),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () async {
-                        if (!isAdmin) {
-                          if (!isClosing) {
-                            isClosing = true;
-                            Navigator.of(ctx).pop();
-                          }
-                          final messenger = ScaffoldMessenger.of(context);
-                          messenger.showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Only admins can delete songs',
-                                style: kBodyText,
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-                        final id = (song['id'] ?? '').toString();
-                        if (id.isEmpty) {
-                          if (!isClosing) {
-                            isClosing = true;
-                            Navigator.of(ctx).pop();
-                          }
-                          final messenger = ScaffoldMessenger.of(context);
-                          messenger.showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Missing song id',
-                                style: kBodyText,
-                              ),
-                            ),
-                          );
-                          return;
-                        }
-
-                        // Show global progress overlay (dismissed via _hideProgressOverlay)
-                        _showProgressOverlay(context);
-                        final messenger = ScaffoldMessenger.of(context);
-
-                        try {
-                          final uid = auth.userId ?? '';
-                          if (uid.isEmpty) {
-                            _hideProgressOverlay();
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Missing user id',
-                                  style: kBodyText,
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          await fns.deleteSongNew(songId: id, userUuid: uid);
-                          if (!mounted) return;
-                          setState(() {
-                            final uid2 = auth.userId;
-                            if (uid2 != null && uid2.isNotEmpty) {
-                              _songsFuture = fns.fetchSongs(userUuid: uid2);
-                            }
-                          });
-                          try {
-                            await auth.refreshRemoteUser(
-                              caller: 'songs.delete',
-                            );
-                          } catch (_) {}
-                          _hideProgressOverlay();
-                          if (!isClosing) {
-                            if (!ctx.mounted) return;
-                            isClosing = true;
-                            Navigator.of(ctx).pop();
-                          }
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text('Song deleted', style: kBodyText),
-                              ),
-                            );
-                          });
-                        } catch (e, st) {
-                          debugPrint(
-                            '[SongRequests] deleteSong error: ${e.toString()}',
-                          );
-                          try {
-                            if (!kIsWeb) {
-                              debugPrintStack(stackTrace: st);
-                            } else {
-                              debugPrint('[stack] $st');
-                            }
-                          } catch (_) {
-                            debugPrint('[stack print failed]');
-                          }
-                          // Similar to add-song, on web the browser may report
-                          // "Failed to fetch" even if the function succeeded.
-                          // Handle optimistically to keep UI responsive.
-                          final msg = e.toString();
-                          final isBrowserFetchError =
-                              msg.contains('Failed to fetch') ||
-                              msg.contains('TimeoutException') ||
-                              msg.contains('NetworkError') ||
-                              msg.contains('XMLHttpRequest error') ||
-                              msg.contains('TypeError');
-                          if (kIsWeb && isBrowserFetchError) {
-                            _hideProgressOverlay();
-                            if (!isClosing) {
-                              if (!ctx.mounted) return;
-                              isClosing = true;
-                              Navigator.of(ctx).pop();
-                            }
-                            if (mounted) {
-                              setState(() {
-                                final uid3 = auth.userId;
-                                if (uid3 != null && uid3.isNotEmpty) {
-                                  _songsFuture = fns.fetchSongs(userUuid: uid3);
-                                }
-                              });
-                            }
-                            try {
-                              await auth.refreshRemoteUser(
-                                caller: 'songs.deleteBrowserFetchError',
-                              );
-                            } catch (_) {}
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Song deleted. Refreshing list…',
-                                  style: kBodyText,
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                          _hideProgressOverlay();
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Failed to delete song: ${e.toString()}',
-                                  style: kBodyText,
-                                ),
-                              ),
-                            );
-                          });
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isAdmin ? kGold : Colors.grey,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: mainBorderRadius,
-                        ),
-                        padding: kButtonPadding,
-                      ),
-                      child: Text('Delete', style: kSectionTitleSmall),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Future<void> _showAddSongDialog(BuildContext context) async {
-    final auth = Provider.of<AuthService>(context, listen: false);
-    final userEmail = auth.email ?? 'Anonymous';
-
-    final formKey = GlobalKey<FormState>();
-    final nameCtrl = TextEditingController();
-    final artistCtrl = TextEditingController();
-    // Guard to prevent multiple close pops
-    var isClosing = false;
-    // Require student acknowledgment before enabling submit
-    var acknowledged = false;
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
-          ),
-          backgroundColor: kWhite,
-          elevation: 8,
-          shape: RoundedRectangleBorder(
-            borderRadius: mainBorderRadius,
-            side: BorderSide(color: kMaroon, width: 1.4),
-          ),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560, maxHeight: 640),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(mainInsidePadding),
-                child: StatefulBuilder(
-                  builder: (ctx2, setStateDialog) {
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: GestureDetector(
-                            onTap: () {
-                              if (isClosing) return;
-                              isClosing = true;
-                              Navigator.of(ctx).pop();
-                            },
-                            child: Icon(Icons.close, color: kGold),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text('Add Song', style: kSectionTitleSmall),
-                        const SizedBox(height: 18),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            child: Form(
-                              autovalidateMode:
-                                  AutovalidateMode.onUserInteraction,
-                              key: formKey,
-                              child: Column(
-                                children: [
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'Song Name',
-                                      style: kSectionTitleSmall.copyWith(
-                                        color: kMaroon,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  TextFormField(
-                                    controller: nameCtrl,
-                                    decoration: InputDecoration(
-                                      hintText: 'Never Gonna Give You Up',
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          kInnerRadius,
-                                        ),
-                                        borderSide: BorderSide(color: kMaroon),
-                                      ),
-                                    ),
-                                    validator: (v) {
-                                      final text = v?.trim() ?? '';
-                                      if (text.isEmpty) {
-                                        return 'Please enter a song name';
-                                      }
-                                      if (containsProfanity(text)) {
-                                        return 'Please remove inappropriate language.';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'Artist Name',
-                                      style: kSectionTitleSmall.copyWith(
-                                        color: kMaroon,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  TextFormField(
-                                    controller: artistCtrl,
-                                    decoration: InputDecoration(
-                                      hintText: 'Rick Astley',
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          kInnerRadius,
-                                        ),
-                                        borderSide: BorderSide(color: kMaroon),
-                                      ),
-                                    ),
-                                    validator: (v) {
-                                      final text = v?.trim() ?? '';
-                                      if (text.isEmpty) {
-                                        return 'Please enter an artist name';
-                                      }
-                                      if (containsProfanity(text)) {
-                                        return 'Please remove inappropriate language.';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 18),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Text(
-                                      'Submitted by: $userEmail',
-                                      style: kPlaceholderText.copyWith(
-                                        color: kMaroon,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 18),
-                                  // Acknowledgement checkbox
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Checkbox(
-                                        value: acknowledged,
-                                        onChanged: (v) => setStateDialog(() {
-                                          acknowledged = v ?? false;
-                                        }),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          'I acknowledge that my school email will be recorded with this request and that submitting inappropriate content may result in disciplinary action.',
-                                          style: kAnnouncementBody.copyWith(
-                                            color: kMaroon,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ElevatedButton(
-                                    onPressed: acknowledged
-                                        ? () async {
-                                            if (!(formKey.currentState
-                                                    ?.validate() ??
-                                                false)) {
-                                              return;
-                                            }
-                                            final artist = artistCtrl.text
-                                                .trim();
-                                            final name = nameCtrl.text.trim();
-                                            // Backend now requires UUID (Firebase UID) instead of email
-                                            final creatorUuid =
-                                                auth.userId ?? '';
-                                            if (creatorUuid.isEmpty) {
-                                              final messenger =
-                                                  ScaffoldMessenger.of(context);
-                                              messenger.showSnackBar(
-                                                SnackBar(
-                                                  content: Text(
-                                                    'Missing user id',
-                                                    style: kBodyText,
-                                                  ),
-                                                ),
-                                              );
-                                              return;
-                                            }
-
-                                            // Show global progress overlay (dismissed via _hideProgressOverlay)
-                                            _showProgressOverlay(context);
-                                            final messenger =
-                                                ScaffoldMessenger.of(context);
-
-                                            try {
-                                              final currentRemote =
-                                                  auth.remoteUser;
-                                              final dynamic rc =
-                                                  currentRemote?['songRequestCount'];
-                                              int? remainingRequests;
-                                              if (rc is int) {
-                                                remainingRequests = rc;
-                                              }
-                                              if (rc is String) {
-                                                remainingRequests =
-                                                    int.tryParse(rc);
-                                              }
-                                              if (remainingRequests != null &&
-                                                  remainingRequests <= 0) {
-                                                _hideProgressOverlay();
-                                                messenger.showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'No song requests left',
-                                                      style: kBodyText,
-                                                    ),
-                                                  ),
-                                                );
-                                                return;
-                                              }
-
-                                              await fns.submitSong(
-                                                artist: artist,
-                                                name: name,
-                                                creatorUuid: creatorUuid,
-                                              );
-                                              if (!mounted) return;
-                                              setState(() {
-                                                final uid4 = auth.userId;
-                                                if (uid4 != null &&
-                                                    uid4.isNotEmpty) {
-                                                  _songsFuture = fns.fetchSongs(
-                                                    userUuid: uid4,
-                                                  );
-                                                }
-                                              });
-                                              try {
-                                                await auth.refreshRemoteUser(
-                                                  caller: 'songs.submit',
-                                                );
-                                              } catch (_) {}
-                                              _hideProgressOverlay();
-                                              if (!isClosing) {
-                                                if (!ctx.mounted) return;
-                                                isClosing = true;
-                                                Navigator.of(ctx).pop();
-                                              }
-                                              WidgetsBinding.instance
-                                                  .addPostFrameCallback((_) {
-                                                    messenger.showSnackBar(
-                                                      SnackBar(
-                                                        content: Text(
-                                                          'Song submitted — thank you!',
-                                                          style: kBodyText,
-                                                        ),
-                                                      ),
-                                                    );
-                                                  });
-                                            } catch (e, st) {
-                                              debugPrint(
-                                                '[SongRequests] submitSong error: ${e.toString()}',
-                                              );
-                                              try {
-                                                if (!kIsWeb) {
-                                                  debugPrintStack(
-                                                    stackTrace: st,
-                                                  );
-                                                } else {
-                                                  debugPrint('[stack] $st');
-                                                }
-                                              } catch (_) {
-                                                debugPrint(
-                                                  '[stack print failed]',
-                                                );
-                                              }
-                                              // On web, a CORS/preflight issue can cause the browser
-                                              // client to report "Failed to fetch" even if the Cloud Function
-                                              // completed. Since we've seen the song actually get added,
-                                              // treat this specific case optimistically: close the dialog,
-                                              // refresh the list, and inform the user.
-                                              final msg = e.toString();
-                                              final isBrowserFetchError =
-                                                  msg.contains(
-                                                    'Failed to fetch',
-                                                  ) ||
-                                                  msg.contains(
-                                                    'TimeoutException',
-                                                  ) ||
-                                                  msg.contains(
-                                                    'NetworkError',
-                                                  ) ||
-                                                  msg.contains(
-                                                    'XMLHttpRequest error',
-                                                  ) ||
-                                                  msg.contains('TypeError');
-                                              if (kIsWeb &&
-                                                  isBrowserFetchError) {
-                                                _hideProgressOverlay();
-                                                if (!isClosing) {
-                                                  if (!ctx.mounted) return;
-                                                  isClosing = true;
-                                                  Navigator.of(ctx).pop();
-                                                }
-                                                if (mounted) {
-                                                  setState(() {
-                                                    final uid5 = auth.userId;
-                                                    if (uid5 != null &&
-                                                        uid5.isNotEmpty) {
-                                                      _songsFuture = fns
-                                                          .fetchSongs(
-                                                            userUuid: uid5,
-                                                          );
-                                                    }
-                                                  });
-                                                }
-                                                try {
-                                                  await auth.refreshRemoteUser(
-                                                    caller:
-                                                        'songs.submitBrowserFetchError',
-                                                  );
-                                                } catch (_) {}
-                                                messenger.showSnackBar(
-                                                  SnackBar(
-                                                    content: Text(
-                                                      'Song submitted. Refreshing list…',
-                                                      style: kBodyText,
-                                                    ),
-                                                  ),
-                                                );
-                                                return;
-                                              }
-                                              _hideProgressOverlay();
-                                              WidgetsBinding.instance
-                                                  .addPostFrameCallback((_) {
-                                                    messenger.showSnackBar(
-                                                      SnackBar(
-                                                        content: Text(
-                                                          'Failed to submit song: ${e.toString()}',
-                                                          style: kBodyText,
-                                                        ),
-                                                      ),
-                                                    );
-                                                  });
-                                            }
-                                          }
-                                        : null,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: kGold,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: mainBorderRadius,
-                                      ),
-                                      padding: kButtonPadding,
-                                    ),
-                                    child: Text(
-                                      'Submit',
-                                      style: kSectionTitleSmall,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
 }
 
-class _SongCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final int upvotes;
-  final VoidCallback? onUpvote;
-
-  const _SongCard({
-    required this.title,
-    required this.subtitle,
-    required this.upvotes,
-    this.onUpvote,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // left upvote area
-        GestureDetector(
-          onTap: onUpvote,
-          child: Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              // Active upvote = gold, inactive = grey
-              color: onUpvote != null ? kGold : Colors.grey,
-              borderRadius: BorderRadius.circular(kInnerRadius),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.arrow_upward, color: kWhite, size: 12),
-                const SizedBox(height: 1),
-                Text(
-                  '$upvotes',
-                  style: kGradeLabel.copyWith(color: kWhite, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        // main card
-        Expanded(
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-              vertical: kMediumPadding,
-              horizontal: kMediumPadding,
-            ),
-            decoration: BoxDecoration(
-              color: kWhite,
-              borderRadius: BorderRadius.circular(kInnerRadius),
-              border: Border.all(color: kMaroon, width: 1.4),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: kAnnouncementTitle.copyWith(color: kMaroon)),
-                const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: kAnnouncementBody.copyWith(color: kMaroon),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
+// Page cleaned & dialogs/cards extracted.

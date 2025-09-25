@@ -6,13 +6,15 @@ import 'package:staapp2025/features/auth/ui/login_page.dart';
 /// Ensures a user is signed in. If not, shows the login page and returns
 /// whether the user ended up signed in.
 Future<bool> ensureSignedIn(BuildContext context) async {
+  // Capture auth before any async gap; we only navigate if not signed in.
   final auth = Provider.of<AuthService>(context, listen: false);
   if (auth.isSignedIn) return true;
   await Navigator.of(
     context,
   ).push(MaterialPageRoute(builder: (_) => const LoginPage()));
+  // After returning, rely on the same auth instance; if widget unmounted, fail.
   if (!context.mounted) return false;
-  return Provider.of<AuthService>(context, listen: false).isSignedIn;
+  return auth.isSignedIn;
 }
 
 /// Pushes a route only if the user is signed in, otherwise routes to login
