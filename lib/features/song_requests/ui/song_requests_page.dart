@@ -52,7 +52,12 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
   @override
   void initState() {
     super.initState();
-    _songsFuture = fns.fetchSongs();
+    final auth = Provider.of<AuthService>(context, listen: false);
+    final uid = auth.userId;
+    // Use new UUID-authenticated fetch; if no uid yet (not signed in), start with empty list future.
+    _songsFuture = (uid == null || uid.isEmpty)
+        ? Future.value(<Map<String, dynamic>>[])
+        : fns.fetchSongs(userUuid: uid);
     // When this page is first created, ensure we refresh the remote user
     // profile so counters (songRequestCount/songUpvoteCount) are available
     // as soon as possible.
@@ -74,7 +79,10 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
 
     // Reload songs from the server and wait for the result so the
     // RefreshIndicator's spinner correlates with network activity.
-    final future = fns.fetchSongs();
+    final uid = auth.userId;
+    final future = (uid == null || uid.isEmpty)
+        ? Future.value(<Map<String, dynamic>>[])
+        : fns.fetchSongs(userUuid: uid);
     setState(() {
       _songsFuture = future;
     });
@@ -342,9 +350,14 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                     userUuid: userUuid,
                                   );
                                   if (!context.mounted) return;
-                                  setState(() {
-                                    _songsFuture = fns.fetchSongs();
-                                  });
+                                  final uid2 = auth.userId;
+                                  if (uid2 != null && uid2.isNotEmpty) {
+                                    setState(() {
+                                      _songsFuture = fns.fetchSongs(
+                                        userUuid: uid2,
+                                      );
+                                    });
+                                  }
                                   try {
                                     await auth.refreshRemoteUser(
                                       caller: 'songs.deleteOptimistic',
@@ -386,9 +399,14 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                   if (kIsWeb && isBrowserFetchError) {
                                     _hideProgressOverlay();
                                     if (mounted) {
-                                      setState(() {
-                                        _songsFuture = fns.fetchSongs();
-                                      });
+                                      final uid3 = auth.userId;
+                                      if (uid3 != null && uid3.isNotEmpty) {
+                                        setState(() {
+                                          _songsFuture = fns.fetchSongs(
+                                            userUuid: uid3,
+                                          );
+                                        });
+                                      }
                                     }
                                     try {
                                       await auth.refreshRemoteUser();
@@ -583,10 +601,26 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                         final messenger = ScaffoldMessenger.of(context);
 
                         try {
-                          await fns.deleteSong(id: id);
+                          final uid = auth.userId ?? '';
+                          if (uid.isEmpty) {
+                            _hideProgressOverlay();
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Missing user id',
+                                  style: kBodyText,
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                          await fns.deleteSongNew(songId: id, userUuid: uid);
                           if (!mounted) return;
                           setState(() {
-                            _songsFuture = fns.fetchSongs();
+                            final uid2 = auth.userId;
+                            if (uid2 != null && uid2.isNotEmpty) {
+                              _songsFuture = fns.fetchSongs(userUuid: uid2);
+                            }
                           });
                           try {
                             await auth.refreshRemoteUser(
@@ -638,7 +672,10 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                             }
                             if (mounted) {
                               setState(() {
-                                _songsFuture = fns.fetchSongs();
+                                final uid3 = auth.userId;
+                                if (uid3 != null && uid3.isNotEmpty) {
+                                  _songsFuture = fns.fetchSongs(userUuid: uid3);
+                                }
                               });
                             }
                             try {
@@ -912,7 +949,13 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                               );
                                               if (!mounted) return;
                                               setState(() {
-                                                _songsFuture = fns.fetchSongs();
+                                                final uid4 = auth.userId;
+                                                if (uid4 != null &&
+                                                    uid4.isNotEmpty) {
+                                                  _songsFuture = fns.fetchSongs(
+                                                    userUuid: uid4,
+                                                  );
+                                                }
                                               });
                                               try {
                                                 await auth.refreshRemoteUser(
@@ -983,8 +1026,14 @@ class _SongRequestsPageState extends State<SongRequestsPage> {
                                                 }
                                                 if (mounted) {
                                                   setState(() {
-                                                    _songsFuture = fns
-                                                        .fetchSongs();
+                                                    final uid5 = auth.userId;
+                                                    if (uid5 != null &&
+                                                        uid5.isNotEmpty) {
+                                                      _songsFuture = fns
+                                                          .fetchSongs(
+                                                            userUuid: uid5,
+                                                          );
+                                                    }
                                                   });
                                                 }
                                                 try {

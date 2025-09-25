@@ -94,13 +94,32 @@ Future<String?> fetchAnnouncementFormUrl({http.Client? client}) async {
 }
 
 // ---------------- Song Requests ----------------
-Future<List<Map<String, dynamic>>> fetchSongs({http.Client? client}) async {
+/// Fetch the list of songs for the current user (UUID required for auth).
+/// Formerly named fetchSongsNew during the 2025-09 migration; the legacy
+/// unauthenticated fetchSongs() has been removed.
+Future<List<Map<String, dynamic>>> fetchSongs({
+  required String userUuid,
+  http.Client? client,
+}) async {
+  if (userUuid.isEmpty) {
+    throw Exception('Missing user UUID');
+  }
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getSongs?t=${DateTime.now().millisecondsSinceEpoch}',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/getSongsNew?userUuid=$userUuid&t=${DateTime.now().millisecondsSinceEpoch}',
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 12));
-  if (resp.statusCode != 200) throw Exception('Failed to load songs');
+  if (resp.statusCode != 200) {
+    try {
+      final parsed = json.decode(resp.body);
+      final msg = parsed is Map && parsed['error'] != null
+          ? parsed['error'].toString()
+          : resp.body.toString();
+      throw Exception(msg);
+    } catch (_) {
+      throw Exception('Failed to load songs');
+    }
+  }
   final body = json.decode(resp.body);
   if (body is Map && body['data'] is List) {
     final list = body['data'] as List;
@@ -194,15 +213,19 @@ Future<Map<String, dynamic>> upvoteSong({
   }
 }
 
-Future<Map<String, dynamic>> deleteSong({
-  required String id,
+/// 2025-09 migration: deleteSongNew requires songId + userUuid.
+Future<Map<String, dynamic>> deleteSongNew({
+  required String songId,
+  required String userUuid,
   http.Client? client,
 }) async {
+  if (songId.isEmpty) throw Exception('Missing songId');
+  if (userUuid.isEmpty) throw Exception('Missing userUuid');
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/deleteSong',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/deleteSongNew',
   );
-  final body = json.encode({'id': id});
+  final body = json.encode({'songId': songId, 'userUuid': userUuid});
   final resp = await client
       .post(url, headers: {'Content-Type': 'text/plain'}, body: body)
       .timeout(const Duration(seconds: 20));
@@ -224,7 +247,7 @@ Future<Map<String, dynamic>> deleteSong({
     }
     return <String, dynamic>{};
   } catch (e) {
-    throw Exception('Failed to parse deleteSong response: ${e.toString()}');
+    throw Exception('Failed to parse deleteSongNew response: ${e.toString()}');
   }
 }
 
