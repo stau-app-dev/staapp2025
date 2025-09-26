@@ -29,11 +29,38 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
   Timer? _resumeRefreshTimer;
   Timer? _fallbackRefreshTimer;
 
+  // New: form URL caching & launch/loading states
+  String? _formUrl;
+  bool _formUrlLoading = false;
+  bool _launching = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _fetchAnnouncements();
+    _preloadFormUrl(); // Prefetch to reduce button latency
+  }
+
+  void _preloadFormUrl() async {
+    try {
+      // Only fetch for signed-in staff
+      AuthService? auth;
+      try {
+        auth = Provider.of<AuthService>(context, listen: false);
+      } catch (_) {}
+      final email = (auth?.email ?? '').toLowerCase();
+      if (!(auth?.isSignedIn ?? false) || !email.endsWith('ycdsb.ca')) return;
+      // Avoid duplicate fetch
+      if (_formUrl != null) return;
+      final url = await fns.fetchAnnouncementFormUrl();
+      if (!mounted) return;
+      setState(() {
+        _formUrl = url;
+      });
+    } catch (_) {
+      // Silent: fallback handled on button press
+    }
   }
 
   Future<void> refreshAnnouncements() async {
@@ -128,70 +155,108 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
             SizedBox(height: 8),
             Center(
               child: ElevatedButton.icon(
-                onPressed: () async {
-                  // Capture messenger before any awaits to avoid using context across async gaps
-                  final messenger = ScaffoldMessenger.of(context);
-                  final ok = await ensureSignedIn(context);
-                  if (!context.mounted) return;
-                  if (!ok) return;
-                  final authNow = Provider.of<AuthService>(
-                    context,
-                    listen: false,
-                  );
-                  final emailNow = (authNow.email ?? '').toLowerCase();
-                  if (!emailNow.endsWith('ycdsb.ca')) {
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Only staff (ycdsb.ca) can add announcements.',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  try {
-                    final url = await fns.fetchAnnouncementFormUrl();
-                    if (url == null || url.trim().isEmpty) {
-                      messenger.showSnackBar(
-                        SnackBar(content: Text('Form URL unavailable')),
-                      );
-                      return;
-                    }
-                    final uri = Uri.parse(url);
-                    if (await canLaunchUrl(uri)) {
-                      final launched = await launchUrl(
-                        uri,
-                        mode: LaunchMode.externalApplication,
-                      );
-                      if (launched) {
-                        _pendingExternalReturn = true;
-                        try {
-                          _fallbackRefreshTimer?.cancel();
-                        } catch (_) {}
-                        _fallbackRefreshTimer = Timer(
-                          const Duration(seconds: 15),
-                          () async {
+                onPressed: (_formUrlLoading || _launching)
+                    ? null
+                    : () async {
+                        final messenger = ScaffoldMessenger.of(context);
+
+                        // Form URL cached? Fetch if not.
+                        String? url = _formUrl;
+                        if (url == null || url.trim().isEmpty) {
+                          setState(() {
+                            _formUrlLoading = true;
+                          });
+                          try {
+                            url = await fns.fetchAnnouncementFormUrl();
                             if (!mounted) return;
-                            await refreshAnnouncements();
-                            _pendingExternalReturn = false;
-                          },
-                        );
-                      }
-                    } else {
-                      messenger.showSnackBar(
-                        SnackBar(content: Text('Could not open form URL')),
-                      );
-                    }
-                  } catch (e) {
-                    messenger.showSnackBar(
-                      SnackBar(
-                        content: Text('Failed to open form: ${e.toString()}'),
-                      ),
-                    );
-                  }
-                },
-                icon: Icon(Icons.add),
-                label: Text('Add Announcement'),
+                            _formUrl = url;
+                          } catch (_) {
+                            if (mounted) {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text('Form URL unavailable'),
+                                ),
+                              );
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() {
+                                _formUrlLoading = false;
+                              });
+                            }
+                          }
+                        }
+
+                        if (url == null || url.trim().isEmpty) return;
+
+                        setState(() {
+                          _launching = true;
+                        });
+                        try {
+                          final uri = Uri.parse(url);
+                          if (await canLaunchUrl(uri)) {
+                            final launched = await launchUrl(
+                              uri,
+                              mode: LaunchMode.externalApplication,
+                            );
+                            if (launched) {
+                              _pendingExternalReturn = true;
+                              try {
+                                _fallbackRefreshTimer?.cancel();
+                              } catch (_) {}
+                              _fallbackRefreshTimer = Timer(
+                                const Duration(seconds: 15),
+                                () async {
+                                  if (!mounted) return;
+                                  await refreshAnnouncements();
+                                  _pendingExternalReturn = false;
+                                },
+                              );
+                            } else {
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text('Could not open form URL'),
+                                ),
+                              );
+                            }
+                          } else {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Could not open form URL'),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          messenger.showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Failed to open form: ${e.toString()}',
+                              ),
+                            ),
+                          );
+                        } finally {
+                          if (mounted) {
+                            setState(() {
+                              _launching = false;
+                            });
+                          }
+                        }
+                      },
+                icon: (_formUrlLoading || _launching)
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: kMaroonAccent,
+                        ),
+                      )
+                    : Icon(Icons.add),
+                label: Text(_formUrlLoading
+                    ? 'Loading...'
+                    : _launching
+                        ? 'Opening...'
+                        : 'Add Announcement'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kGold,
                   foregroundColor: kWhite,
