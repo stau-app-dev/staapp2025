@@ -6,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:staapp2025/common/widgets/error_card.dart';
 import 'package:staapp2025/core/firebase_functions.dart' as fns;
 import 'dart:async';
-import 'package:staapp2025/features/auth/guard.dart';
 
 class AnnouncementsBlock extends StatefulWidget {
   const AnnouncementsBlock({super.key});

@@ -99,6 +99,11 @@ class _HomeScreenState extends State<HomeScreen> {
       // Use guard helper to handle login flow
       final ok = await ensureSignedIn(context);
       if (!mounted || !ok) return;
+      // After a successful login, always land on Home
+      setState(() {
+        _selectedIndex = 0;
+      });
+      return;
     }
 
     setState(() {
