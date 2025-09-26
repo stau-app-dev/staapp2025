@@ -10,7 +10,7 @@ Future<List<Map<String, String>>> fetchAnnouncements({
 }) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getGeneralAnnouncements?t=${DateTime.now().millisecondsSinceEpoch}',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/getGeneralAnnouncementsNew?t=${DateTime.now().millisecondsSinceEpoch}',
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load announcements');
@@ -63,7 +63,7 @@ Future<Map<String, dynamic>> fetchSpiritMeters({http.Client? client}) async {
 Future<int?> fetchDayNumber({http.Client? client}) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getDayNumber?t=${DateTime.now().millisecondsSinceEpoch}',
+    'https://us-central1-staugustinechsapp.cloudfunctions.net/getDayNumberNew?t=${DateTime.now().millisecondsSinceEpoch}',
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load day number');
