@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:staapp2025/common/widgets/error_card.dart';
 import 'package:staapp2025/core/firebase_functions.dart' as fns;
 import 'dart:async';
+import 'package:flutter/gestures.dart';
 
 class AnnouncementsBlock extends StatefulWidget {
   const AnnouncementsBlock({super.key});
@@ -172,9 +173,7 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
                           } catch (_) {
                             if (mounted) {
                               messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text('Form URL unavailable'),
-                                ),
+                                SnackBar(content: Text('Form URL unavailable')),
                               );
                             }
                           } finally {
@@ -251,11 +250,13 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
                         ),
                       )
                     : Icon(Icons.add),
-                label: Text(_formUrlLoading
-                    ? 'Loading...'
-                    : _launching
-                        ? 'Opening...'
-                        : 'Add Announcement'),
+                label: Text(
+                  _formUrlLoading
+                      ? 'Loading...'
+                      : _launching
+                      ? 'Opening...'
+                      : 'Add Announcement',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kGold,
                   foregroundColor: kWhite,
@@ -295,7 +296,10 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
                           children: [
                             Text(a['title'] ?? '', style: kAnnouncementTitle),
                             SizedBox(height: Spacing.tiny),
-                            Text(a['body'] ?? '', style: kAnnouncementBody),
+                            _LinkifiedText(
+                              text: a['body'] ?? '',
+                              style: kAnnouncementBody,
+                            ),
                           ],
                         ),
                       ),
@@ -319,7 +323,10 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
                           children: [
                             Text(a['title'] ?? '', style: kAnnouncementTitle),
                             SizedBox(height: Spacing.tiny),
-                            Text(a['body'] ?? '', style: kAnnouncementBody),
+                            _LinkifiedText(
+                              text: a['body'] ?? '',
+                              style: kAnnouncementBody,
+                            ),
                           ],
                         ),
                       ),
@@ -332,5 +339,63 @@ class AnnouncementsBlockState extends State<AnnouncementsBlock>
         ],
       ),
     );
+  }
+}
+
+class _LinkifiedText extends StatelessWidget {
+  const _LinkifiedText({required this.text, required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  // Match http(s) URLs OR bare domains (e.g., example.com, www.example.com)
+  static final _urlRegex = RegExp(
+    r'((?:https?:\/\/)?(?:www\.)?[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.[a-z]{2,}(?:\S*)?)',
+    caseSensitive: false,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final spans = <InlineSpan>[];
+    final matches = _urlRegex.allMatches(text).toList();
+    if (matches.isEmpty) {
+      return Text(text, style: style);
+    }
+
+    int last = 0;
+    for (final m in matches) {
+      if (m.start > last) {
+        spans.add(TextSpan(text: text.substring(last, m.start), style: style));
+      }
+      final raw = text.substring(m.start, m.end);
+      // Trim trailing punctuation that often follows links in prose
+      String url = raw.replaceFirst(RegExp(r'[\.,)\]\}]$'), '');
+      // Add https scheme if missing
+      if (!url.toLowerCase().startsWith('http://') &&
+          !url.toLowerCase().startsWith('https://')) {
+        url = 'https://$url';
+      }
+      spans.add(
+        TextSpan(
+          text: raw,
+          style: style.copyWith(fontWeight: FontWeight.bold),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () async {
+              try {
+                final uri = Uri.parse(url);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              } catch (_) {}
+            },
+        ),
+      );
+      last = m.end;
+    }
+    if (last < text.length) {
+      spans.add(TextSpan(text: text.substring(last), style: style));
+    }
+
+    return Text.rich(TextSpan(children: spans));
   }
 }
