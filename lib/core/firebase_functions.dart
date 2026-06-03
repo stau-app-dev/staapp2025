@@ -10,7 +10,7 @@ Future<List<Map<String, String>>> fetchAnnouncements({
 }) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getGeneralAnnouncementsNew?t=${DateTime.now().millisecondsSinceEpoch}',
+    'https://getgeneralannouncementsg2-t62xz5d4pa-uc.a.run.app?t=${DateTime.now().millisecondsSinceEpoch}',
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load announcements');
@@ -33,7 +33,7 @@ Future<List<Map<String, String>>> fetchAnnouncements({
 Future<String?> fetchVerseOfDay({http.Client? client}) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getVerseOfDay?t=${DateTime.now().millisecondsSinceEpoch}',
+    'https://getverseofdayg2-t62xz5d4pa-uc.a.run.app?t=${DateTime.now().millisecondsSinceEpoch}',
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load verse');
@@ -49,7 +49,7 @@ Future<String?> fetchVerseOfDay({http.Client? client}) async {
 Future<Map<String, dynamic>> fetchSpiritMeters({http.Client? client}) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getSpiritMeters?t=${DateTime.now().millisecondsSinceEpoch}',
+    'https://getspiritmetersg2-t62xz5d4pa-uc.a.run.app?t=${DateTime.now().millisecondsSinceEpoch}',
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load spirit meters');
@@ -63,7 +63,7 @@ Future<Map<String, dynamic>> fetchSpiritMeters({http.Client? client}) async {
 Future<int?> fetchDayNumber({http.Client? client}) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getDayNumberNew?t=${DateTime.now().millisecondsSinceEpoch}',
+    'https://getdaynumberg2-t62xz5d4pa-uc.a.run.app?t=${DateTime.now().millisecondsSinceEpoch}',
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load day number');
@@ -80,7 +80,7 @@ Future<int?> fetchDayNumber({http.Client? client}) async {
 Future<String?> fetchAnnouncementFormUrl({http.Client? client}) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getAnnouncementFormUrl?t=${DateTime.now().millisecondsSinceEpoch}',
+    'https://getannouncementformurlg2-t62xz5d4pa-uc.a.run.app?t=${DateTime.now().millisecondsSinceEpoch}',
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 10));
   if (resp.statusCode != 200) throw Exception('Failed to load form url');
@@ -106,7 +106,7 @@ Future<List<Map<String, dynamic>>> fetchSongs({
   }
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/getSongsNew?userUuid=$userUuid&t=${DateTime.now().millisecondsSinceEpoch}',
+    'https://getsongsg2-t62xz5d4pa-uc.a.run.app?userUuid=$userUuid&t=${DateTime.now().millisecondsSinceEpoch}',
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 12));
   if (resp.statusCode != 200) {
@@ -140,7 +140,7 @@ Future<Map<String, dynamic>> submitSong({
 }) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/addSongNew',
+    'https://addsongg2-t62xz5d4pa-uc.a.run.app',
   );
   final body = json.encode({
     'artist': artist,
@@ -185,7 +185,7 @@ Future<Map<String, dynamic>> upvoteSong({
 }) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/upvoteSongNew',
+    'https://upvotesongg2-t62xz5d4pa-uc.a.run.app',
   );
   final body = json.encode({'songId': songId, 'userUuid': userUuid});
   final resp = await client
@@ -223,7 +223,7 @@ Future<Map<String, dynamic>> deleteSongNew({
   if (userUuid.isEmpty) throw Exception('Missing userUuid');
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/deleteSongNew',
+    'https://deletesongg2-t62xz5d4pa-uc.a.run.app',
   );
   final body = json.encode({'songId': songId, 'userUuid': userUuid});
   final resp = await client
@@ -260,10 +260,9 @@ Future<Map<String, dynamic>> getUser({
 }) async {
   client ??= http.Client();
   // Build URL with proper encoding for all query parameters.
-  final url = Uri.https(
-    'us-central1-staugustinechsapp.cloudfunctions.net',
-    '/getUser',
-    {'id': id, 'email': email, 'name': name},
+  final baseUrl = Uri.parse('https://getuserg2-t62xz5d4pa-uc.a.run.app');
+  final url = baseUrl.replace(
+    queryParameters: {'id': id, 'email': email, 'name': name},
   );
   final resp = await client.get(url).timeout(const Duration(seconds: 6));
   if (resp.statusCode != 200) {
@@ -298,7 +297,7 @@ Future<Map<String, dynamic>> updateUserField({
 }) async {
   client ??= http.Client();
   final url = Uri.parse(
-    'https://us-central1-staugustinechsapp.cloudfunctions.net/updateUserField',
+    'https://updateuserfieldg2-t62xz5d4pa-uc.a.run.app',
   );
   final body = json.encode({'id': id, 'field': field, 'value': value});
   final resp = await client
