@@ -244,26 +244,18 @@ class AuthService extends ChangeNotifier {
     if (kIsWeb) {
       final provider = fb.GoogleAuthProvider()
         ..setCustomParameters({'prompt': 'select_account'});
-      bool useRedirect = false;
+      // Clear legacy sticky flag; redirect breaks in storage-partitioned Chrome.
       try {
         final prefs = await SharedPreferences.getInstance();
-        useRedirect = prefs.getBool('useWebRedirect') ?? false;
+        await prefs.remove('useWebRedirect');
       } catch (_) {}
-      if (useRedirect) {
-        debugPrint('[WebAuth] Using redirect flow');
-        await fb.FirebaseAuth.instance.signInWithRedirect(provider);
-        return;
-      }
       fb.UserCredential cred;
       try {
         debugPrint('[WebAuth] Attempting popup sign-in');
         cred = await fb.FirebaseAuth.instance.signInWithPopup(provider);
       } catch (e) {
-        // Popup blocked or not allowed – remember and fall back to redirect next time
-        try {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setBool('useWebRedirect', true);
-        } catch (_) {}
+        final code = e is fb.FirebaseAuthException ? e.code : '';
+        if (code != 'popup-blocked') rethrow;
         debugPrint(
           '[WebAuth] Popup failed (${e.toString()}), falling back to redirect',
         );
